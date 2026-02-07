@@ -13,6 +13,7 @@ Requires-Dist: langsmith<0.4,>=0.1
 Requires-Dist: click<9,>=8.1
 Requires-Dist: rich<14,>=13.0
 Requires-Dist: pydantic<3,>=2.0
+Requires-Dist: python-dotenv<2,>=1.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
@@ -29,13 +30,11 @@ Built with **LangChain + LangGraph** for a hackathon.
 # Install in editable mode
 pip install -e ".[dev]"
 
-# Set your OpenAI key (required)
-export OPENAI_API_KEY="sk-..."
-
-# Optional: enable LangSmith tracing
-export LANGSMITH_TRACING=true
-export LANGSMITH_API_KEY="ls-..."
-export LANGSMITH_PROJECT="bugfixer"
+# Create a .env file with your environment variables (required)
+# OPENAI_API_KEY="sk-..."
+# LANGSMITH_TRACING=true
+# LANGSMITH_API_KEY="ls-..."
+# LANGSMITH_PROJECT="bugfixer"
 
 # Run the agent
 bugfixer run
