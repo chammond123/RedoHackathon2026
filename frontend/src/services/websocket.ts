@@ -43,6 +43,11 @@ export function useWebSocket() {
           case "metrics_update":
             useAppStore.getState().setMetrics(event.metrics);
             break;
+          case "ticket_created":
+          case "ticket_updated":
+            // Notify store of new/updated ticket from BuggyDemo chat
+            useAppStore.getState().upsertTicket?.(event.ticket);
+            break;
         }
       } catch {
         // Ignore malformed messages

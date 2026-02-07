@@ -24,6 +24,9 @@ const AGENT_URL = process.env.AGENT_URL || "http://agent:8000";
 const API_KEY = process.env.GATEWAY_API_KEY || ""; // empty = no auth
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || "internal-dev"; // shared secret for internal API
 
+// ── In-memory bug ticket store (synced to frontend) ──────
+const bugTickets = new Map(); // ticket_id → ticket data
+
 // ── App ──────────────────────────────────────────────────
 
 const app = express();
@@ -83,19 +86,64 @@ app.get("/healthz", (_req, res) => res.json({ status: "ok", service: "gateway" }
 
 /**
  * POST /api/chat/start
- * Body: { bug_report, repo_path? }
- * Returns: { chat_id, status }
+ * Body: { bug_report, repo_path?, ticket? }
+ * Returns: { chat_id, status, ticket_id? }
+ * 
+ * If `ticket` object is provided, it will be stored and synced to the frontend.
  */
 app.post("/api/chat/start", requirePublicAuth, async (req, res) => {
   try {
-    const { bug_report, repo_path = "." } = req.body;
+    const { bug_report, repo_path = ".", ticket } = req.body;
     if (!bug_report) return res.status(400).json({ error: "bug_report is required" });
+
+    // Store the bug ticket if provided (for frontend dashboard sync)
+    let ticketId = null;
+    if (ticket) {
+      ticketId = uuidv4();
+      const storedTicket = {
+        id: ticketId,
+        ...ticket,
+        submitted_at: ticket.submitted_at || now(),
+        status: "processing",
+        run_id: null, // will be updated after agent starts
+      };
+      bugTickets.set(ticketId, storedTicket);
+
+      // Broadcast new ticket to internal (frontend) clients
+      broadcastEvent({
+        type: "ticket_created",
+        visibility: "INTERNAL",
+        ticket: storedTicket,
+        timestamp: now(),
+      });
+    }
 
     const result = await agentFetch("/api/runs", {
       method: "POST",
       body: JSON.stringify({ bug_report, repo_path }),
     });
-    res.status(201).json({ chat_id: result.id, status: result.status });
+
+    // Link ticket to the run
+    if (ticketId && bugTickets.has(ticketId)) {
+      const t = bugTickets.get(ticketId);
+      t.run_id = result.id;
+      t.status = "running";
+      bugTickets.set(ticketId, t);
+
+      // Notify frontend of the link
+      broadcastEvent({
+        type: "ticket_updated",
+        visibility: "INTERNAL",
+        ticket: t,
+        timestamp: now(),
+      });
+    }
+
+    res.status(201).json({
+      chat_id: result.id,
+      status: result.status,
+      ticket_id: ticketId,
+    });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
@@ -139,9 +187,162 @@ app.get("/api/chat/:id/status", requirePublicAuth, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+//  BUG TICKETS API (syncs BuggyDemo reports to frontend)
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * GET /api/tickets
+ * Returns all bug tickets (for frontend dashboard)
+ */
+app.get("/api/tickets", requireInternalAuth, (_req, res) => {
+  const tickets = Array.from(bugTickets.values())
+    .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+  res.json(tickets);
+});
+
+/**
+ * GET /api/tickets/:id
+ * Returns a specific bug ticket
+ */
+app.get("/api/tickets/:id", requireInternalAuth, (req, res) => {
+  const ticket = bugTickets.get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+  res.json(ticket);
+});
+
+/**
+ * POST /api/tickets
+ * Create a bug ticket WITHOUT starting an agent run
+ * Body: { title, description, module, severity, reporter, steps }
+ */
+app.post("/api/tickets", requireInternalAuth, (req, res) => {
+  const ticketId = uuidv4();
+  const ticket = {
+    id: ticketId,
+    title: req.body.title || "Untitled",
+    description: req.body.description || "",
+    module: req.body.module || "",
+    severity: req.body.severity || "medium",
+    reporter: req.body.reporter || "Unknown",
+    steps: req.body.steps || "",
+    submitted_at: now(),
+    status: "pending",
+    run_id: null,
+  };
+  bugTickets.set(ticketId, ticket);
+
+  broadcastEvent({
+    type: "ticket_created",
+    visibility: "INTERNAL",
+    ticket,
+    timestamp: now(),
+  });
+
+  res.status(201).json(ticket);
+});
+
+/**
+ * POST /api/tickets/:id/start
+ * Start an agent run for an existing ticket
+ */
+app.post("/api/tickets/:id/start", requireInternalAuth, async (req, res) => {
+  const ticket = bugTickets.get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+  if (ticket.run_id) return res.status(400).json({ error: "Ticket already has a run" });
+
+  try {
+    const bug_report = `${ticket.title}\n\n${ticket.description}\n\nSteps: ${ticket.steps}\nModule: ${ticket.module}\nSeverity: ${ticket.severity}`;
+    const result = await agentFetch("/api/runs", {
+      method: "POST",
+      body: JSON.stringify({
+        bug_report,
+        repo_path: req.body.repo_path || "/app/BuggyDemo"
+      }),
+    });
+
+    ticket.run_id = result.id;
+    ticket.status = "running";
+    bugTickets.set(req.params.id, ticket);
+
+    broadcastEvent({
+      type: "ticket_updated",
+      visibility: "INTERNAL",
+      ticket,
+      timestamp: now(),
+    });
+
+    res.json({ ticket, run: result });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  DYNAMIC CHAT FEATURES
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * POST /api/chat/:id/typing
+ * Emit a "typing" indicator to connected clients (makes chat feel more alive)
+ */
+app.post("/api/chat/:id/typing", requirePublicAuth, (req, res) => {
+  const { id } = req.params;
+  const { is_typing = true, message } = req.body;
+
+  broadcastEvent({
+    type: "typing",
+    visibility: "PUBLIC",
+    request_id: id,
+    is_typing,
+    message: message || (is_typing ? "Agent is thinking..." : null),
+    timestamp: now(),
+  });
+
+  res.json({ ok: true });
+});
+
+/**
+ * POST /api/chat/:id/feedback
+ * Send intermediate feedback/hints to the user during processing
+ */
+app.post("/api/chat/:id/feedback", requirePublicAuth, (req, res) => {
+  const { id } = req.params;
+  const { message, type = "info" } = req.body;
+
+  broadcastEvent({
+    type: "chat_feedback",
+    visibility: "PUBLIC",
+    request_id: id,
+    feedback_type: type, // "info", "warning", "success", "question"
+    message,
+    timestamp: now(),
+  });
+
+  res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════════
 //  INTERNAL GUI API  (all visibility levels)
 //  Proxied straight through to the Python agent
 // ═══════════════════════════════════════════════════════════
+
+// Handle POST /api/requests specially to auto-subscribe to new runs
+app.post("/api/requests", requireInternalAuth, async (req, res) => {
+  try {
+    const result = await agentFetch("/api/requests", {
+      method: "POST",
+      body: JSON.stringify(req.body),
+    });
+    // Auto-subscribe to events for the new run
+    if (result.id) {
+      console.log(`[Gateway] New run created: ${result.id}, subscribing to events...`);
+      subscribeToRunEvents(result.id);
+    }
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
 
 // Catch-all proxy: forward any /api/* (except /api/chat/*) to the agent
 app.all("/api/{*splat}", requireInternalAuth, async (req, res) => {
@@ -224,6 +425,9 @@ server.on("upgrade", (req, socket, head) => {
       clients.set(ws, { type: "internal", subscriptions: new Set(["*"]) });
       ws.send(JSON.stringify({ type: "connected", visibility: "INTERNAL" }));
 
+      // Subscribe to all active runs when internal client connects
+      subscribeToActiveRuns();
+
       ws.on("message", (data) => {
         try {
           const msg = JSON.parse(data);
@@ -246,20 +450,37 @@ server.on("upgrade", (req, socket, head) => {
 
 const activeSSE = new Set(); // run IDs we're already subscribed to
 
+async function subscribeToActiveRuns() {
+  // Fetch all runs and subscribe to active ones
+  try {
+    const runs = await agentFetch("/api/runs");
+    for (const run of runs) {
+      if (!["complete", "failed"].includes(run.status)) {
+        subscribeToRunEvents(run.id);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to subscribe to active runs:", err.message);
+  }
+}
+
 function subscribeToRunEvents(runId) {
   if (activeSSE.has(runId)) return;
   activeSSE.add(runId);
+  console.log(`[SSE] Subscribing to run ${runId}`);
 
   const es = new EventSource(`${AGENT_URL}/api/runs/${runId}/events`);
 
   es.onmessage = (evt) => {
     try {
       const event = JSON.parse(evt.data);
+      console.log(`[SSE] Event from ${runId}: ${event.type}`);
       broadcastEvent(event);
     } catch { /* ignore */ }
   };
 
   es.onerror = () => {
+    console.log(`[SSE] Connection closed for ${runId}`);
     es.close();
     activeSSE.delete(runId);
   };

@@ -103,3 +103,33 @@ export function validateRepository(path: string): Promise<{ valid: boolean; mess
     body: JSON.stringify({ path }),
   });
 }
+
+// ── Bug Tickets (synced from BuggyDemo chat) ──
+
+export interface BugTicket {
+  id: string;
+  title: string;
+  description: string;
+  module: string;
+  severity: string;
+  reporter: string;
+  steps: string;
+  submitted_at: string;
+  status: "pending" | "running" | "complete" | "failed";
+  run_id: string | null;
+}
+
+export function fetchTickets(): Promise<BugTicket[]> {
+  return request<BugTicket[]>("/tickets");
+}
+
+export function fetchTicket(id: string): Promise<BugTicket> {
+  return request<BugTicket>(`/tickets/${id}`);
+}
+
+export function startTicketRun(ticketId: string, repoPath?: string): Promise<{ ticket: BugTicket; run: BugRequest }> {
+  return request<{ ticket: BugTicket; run: BugRequest }>(`/tickets/${ticketId}/start`, {
+    method: "POST",
+    body: JSON.stringify({ repo_path: repoPath }),
+  });
+}

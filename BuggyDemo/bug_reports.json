@@ -16,5 +16,23 @@
     "description": "Hey I can't seem to complete my tasks\n\nExpected: I expected them to move to completed\n\nSteps to reproduce:\nadd task, click on complete\n\nSuspected module: unknown\nSeverity: medium",
     "steps": "add task, click on complete",
     "submitted_at": "2026-02-07 13:46:44"
+  },
+  {
+    "reporter": "Chat User",
+    "module": "unknown",
+    "severity": "medium",
+    "title": "When I delete a task and add a new one, it uses the same id as the previous one",
+    "description": "When I delete a task and add a new one, it uses the same id as the previous one\n\nExpected: Generate a new id\n\nSteps to reproduce:\nadd task, delete task, add task\n\nSuspected module: unknown\nSeverity: medium",
+    "steps": "add task, delete task, add task",
+    "submitted_at": "2026-02-07 14:43:06"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I purge all tasks, it seems to miss some?",
+    "description": "When I purge all tasks, it seems to miss some?",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:46:04"
   }
 ]

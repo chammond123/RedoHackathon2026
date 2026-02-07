@@ -14,8 +14,8 @@
         <div id="chat-messages">
             <div class="chat-msg bot">
                 <div class="msg-bubble">
-                    Hi! I'm the bug report assistant. Describe the bug you found and I'll help you file a report.<br><br>
-                    <em>What went wrong?</em>
+                    Hi! I'm here to help you report any issues you've found.<br><br>
+                    <em>Please describe what went wrong:</em>
                 </div>
             </div>
         </div>
@@ -178,6 +178,31 @@
     @media (max-width: 480px) {
         #bug-chat-window { width: calc(100vw - 2rem); right: -0.5rem; }
     }
+
+    /* Typing indicator animation */
+    .typing-indicator .msg-bubble {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 0.8rem 1rem;
+    }
+    
+    .typing-indicator .dot {
+        width: 8px;
+        height: 8px;
+        background: #0a3d62;
+        border-radius: 50%;
+        animation: typing-bounce 1.4s infinite ease-in-out;
+    }
+    
+    .typing-indicator .dot:nth-child(1) { animation-delay: 0s; }
+    .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes typing-bounce {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+        30% { transform: translateY(-6px); opacity: 1; }
+    }
 </style>
 
 <script>
@@ -186,7 +211,7 @@
     //  Configuration
     // ---------------------------------------------------------------
     // Gateway public chat API & local bug-report save endpoint
-    const GATEWAY_URL   = window.BUGFIXER_GATEWAY_URL || 'http://localhost:3001';
+    const GATEWAY_URL   = window.BUGFIXER_GATEWAY_URL || 'http://localhost:8000';
     const LOCAL_API_URL = '/api/bug-report';          // save to Flask too
     const API_KEY       = window.BUGFIXER_API_KEY || '';
     const REPO_PATH     = window.BUGFIXER_REPO_PATH || '/app/BuggyDemo';
@@ -202,6 +227,7 @@
     let step      = 0;   // conversation step
     let answers   = [];
     let chatId    = null; // active agent run id
+    let ticketId  = null; // ticket id (synced to frontend)
     let ws        = null; // WebSocket for live updates
     let agentDone = false;
 
@@ -252,38 +278,32 @@
         messages.scrollTop = messages.scrollHeight;
     }
 
-    // ── Conversation flow (5 steps → collect bug info) ──
+    // ── Conversation flow (2 steps: description → optional email) ──
     function getReply(userMessage) {
         switch (step) {
             case 0:
-                return 'Got it \u2014 "' + userMessage + '".<br><br>What did you <em>expect</em> to happen instead?';
+                return 'Thanks for letting us know!<br><br>' +
+                    'If you\'d like us to follow up with you, please enter your <strong>email address</strong>.<br>' +
+                    '<small>(Or type "skip" to submit anonymously)</small>';
             case 1:
-                return 'Thanks. Can you list the <strong>steps to reproduce</strong> this bug?<br><small>(e.g. "1. Add a task &nbsp;2. Delete it &nbsp;3. Add another")</small>';
-            case 2:
-                return 'Which module do you think is affected?<br><br>' +
-                    '<small>Options: <code>tasks.py</code> \u00b7 <code>storage.py</code> \u00b7 <code>utils.py</code> \u00b7 <code>app.py</code> \u00b7 <code>constants.py</code> \u00b7 <code>unknown</code></small>';
-            case 3:
-                return 'And how severe is this?<br><br>' +
-                    '<small><strong>low</strong> \u00b7 <strong>medium</strong> \u00b7 <strong>high</strong> \u00b7 <strong>critical</strong></small>';
-            case 4:
-                return '⏳ Submitting to BugFixer agent\u2026';
+                return '⏳ Submitting your report\u2026';
             default:
                 return null;
         }
     }
 
     function buildBugReport() {
-        const desc = answers[0] + '\n\nExpected: ' + answers[1]
-                   + '\n\nSteps to reproduce:\n' + answers[2]
-                   + '\n\nSuspected module: ' + answers[3]
-                   + '\nSeverity: ' + answers[4];
+        const bugDescription = answers[0];
+        const email = answers[1] && answers[1].toLowerCase() !== 'skip' ? answers[1] : '';
+        
         return {
-            title:       answers[0].substring(0, 80),
-            description: desc,
-            steps:       answers[2],
-            module:      answers[3],
-            severity:    answers[4].toLowerCase(),
-            reporter:    'Chat User',
+            title:       bugDescription.substring(0, 80),
+            description: bugDescription,
+            steps:       '',
+            module:      '',
+            severity:    'medium',
+            reporter:    email || 'Anonymous',
+            email:       email,
         };
     }
 
@@ -296,7 +316,11 @@
             body: JSON.stringify(report),
         }).catch(function() { /* ok if local save fails */ });
 
+        // Show typing indicator while connecting
+        showTypingIndicator();
+
         // 2) Start an agent run via the gateway's public chat API
+        //    Include the ticket data so it syncs to the frontend dashboard
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (API_KEY) headers['X-API-Key'] = API_KEY;
@@ -307,8 +331,19 @@
                 body: JSON.stringify({
                     bug_report: report.description,
                     repo_path:  REPO_PATH,
+                    // Include ticket data for frontend dashboard sync
+                    ticket: {
+                        title: report.title,
+                        description: report.description,
+                        steps: report.steps,
+                        module: report.module,
+                        severity: report.severity,
+                        reporter: report.reporter,
+                    }
                 }),
             });
+
+            hideTypingIndicator();
 
             if (!resp.ok) {
                 const err = await resp.json().catch(function() { return {}; });
@@ -317,22 +352,41 @@
 
             const data = await resp.json();
             chatId = data.chat_id;
+            ticketId = data.ticket_id;
             agentDone = false;
 
             botReply(
-                '✅ Bug report submitted!<br><br>' +
-                '<strong>Bug:</strong> ' + report.title + '<br>' +
-                '<strong>Module:</strong> ' + report.module + '<br>' +
-                '<strong>Severity:</strong> ' + report.severity + '<br><br>' +
-                '🤖 <strong>BugFixer agent started</strong> (run <code>' + chatId.substring(0, 8) + '…</code>)<br>' +
-                '<em>I\'ll stream live progress below…</em>'
+                '✅ <strong>Thank you!</strong> Your bug report has been submitted.<br><br>' +
+                (report.email ? '📧 We\'ll follow up at <strong>' + report.email + '</strong> if needed.<br><br>' : '') +
+                'Our team is now looking into this issue. ' +
+                '<em>You can close this chat or report another issue.</em>'
             );
 
             // 3) Open a public WebSocket to receive live agent updates
             connectWebSocket(chatId);
 
         } catch (err) {
+            hideTypingIndicator();
             botReply('⚠️ Failed to start agent: ' + err.message + '<br><br><em>The bug report was saved locally.</em>');
+        }
+    }
+
+    // ── Typing indicator for dynamic feel ──
+    let typingDiv = null;
+    
+    function showTypingIndicator() {
+        if (typingDiv) return;
+        typingDiv = document.createElement('div');
+        typingDiv.className = 'chat-msg bot typing-indicator';
+        typingDiv.innerHTML = '<div class="msg-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+        messages.appendChild(typingDiv);
+        messages.scrollTop = messages.scrollHeight;
+    }
+    
+    function hideTypingIndicator() {
+        if (typingDiv) {
+            typingDiv.remove();
+            typingDiv = null;
         }
     }
 
@@ -375,7 +429,27 @@
                 // initial handshake, ignore
                 break;
 
+            case 'typing': {
+                // Dynamic typing indicator from agent
+                if (event.is_typing) {
+                    showTypingIndicator();
+                } else {
+                    hideTypingIndicator();
+                }
+                break;
+            }
+
+            case 'chat_feedback': {
+                // Intermediate feedback during processing
+                hideTypingIndicator();
+                const icons = { info: 'ℹ️', warning: '⚠️', success: '✅', question: '❓' };
+                const icon = icons[event.feedback_type] || 'ℹ️';
+                systemReply(icon + ' ' + event.message);
+                break;
+            }
+
             case 'phase_change': {
+                hideTypingIndicator();
                 const icon = PHASE_ICONS[event.phase] || '▶';
                 const msg = event.message || ('Phase: ' + event.phase);
                 systemReply(icon + ' ' + msg);
@@ -383,6 +457,7 @@
             }
 
             case 'run_complete': {
+                hideTypingIndicator();
                 agentDone = true;
                 const icon = event.status === 'complete' ? '🎉' : '❌';
                 const msg = event.message || (event.status === 'complete'
@@ -399,6 +474,7 @@
             default:
                 // Other public events — show message if present
                 if (event.message) {
+                    hideTypingIndicator();
                     systemReply(event.message);
                 }
         }
@@ -463,7 +539,7 @@
         var reply = getReply(text);
         if (reply) botReply(reply);
 
-        if (step === 4) {
+        if (step === 1) {
             await submitReport(buildBugReport());
             step = 0;
             answers = [];
@@ -487,10 +563,12 @@
         step = 0;
         answers = [];
         chatId = null;
+        ticketId = null;
         agentDone = false;
+        hideTypingIndicator();
         if (ws) { ws.close(); ws = null; }
         messages.innerHTML = '';
-        botReply('Hi! I\'m the bug report assistant. Describe the bug you found and I\'ll help you file a report.<br><br><em>What went wrong?</em>');
+        botReply('Hi! I\'m here to help you report any issues you\'ve found.<br><br><em>Please describe what went wrong:</em>');
     });
 })();
 </script>

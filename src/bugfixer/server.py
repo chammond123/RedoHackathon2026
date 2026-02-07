@@ -143,6 +143,8 @@ def _public_state_summary(state: dict[str, Any]) -> dict[str, Any]:
 
 async def _run_agent(run_id: str, run_data: dict[str, Any]):
     """Execute the LangGraph agent and emit events."""
+    logger.info(f"[{run_id[:8]}] Starting agent run for: {run_data['bug_report'][:50]}...")
+    
     configure_langsmith()
     if run_data.get("model"):
         os.environ["BUGFIXER_MODEL"] = run_data["model"]
@@ -158,6 +160,13 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
     prev_log_count = 0
     prev_status = ""
     last_state = state.copy()  # Start with initial state
+    
+    # Emit initial "running" status
+    _runs[run_id]["status"] = "intake"
+    _emit(run_id, "phase_change", Visibility.PUBLIC, {
+        "phase": "intake",
+        "message": _PUBLIC_PHASE_MSG.get("intake", "Starting analysis…"),
+    })
 
     try:
         for event in graph.stream(state, {"recursion_limit": 100}):
@@ -167,12 +176,19 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
             
             # Merge node outputs into our tracked state
             for node_name, node_output in event.items():
+                logger.info(f"[{run_id[:8]}] Node completed: {node_name}")
                 if isinstance(node_output, dict):
                     last_state.update(node_output)
                 
             # Detect phase transitions
             cur_status = last_state.get("status", "")
             if cur_status and cur_status != prev_status:
+                logger.info(f"[{run_id[:8]}] Status changed: {prev_status} -> {cur_status}")
+                # Update the run record in real-time
+                _runs[run_id]["status"] = cur_status
+                _runs[run_id]["updated_at"] = _ts()
+                _runs[run_id]["agent_state"] = dict(last_state)
+                
                 # PUBLIC: user-friendly phase message
                 _emit(run_id, "phase_change", Visibility.PUBLIC, {
                     "phase": cur_status,

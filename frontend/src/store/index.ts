@@ -4,6 +4,7 @@
 
 import { create } from "zustand";
 import type { AgentState, DashboardMetrics, LogEntry } from "@/types";
+import type { BugTicket } from "@/services/api";
 
 interface AppStoreState {
   // ── Sidebar ──
@@ -25,6 +26,10 @@ interface AppStoreState {
   // ── Metrics (pushed via WS) ──
   metrics: DashboardMetrics | null;
   setMetrics: (m: DashboardMetrics) => void;
+
+  // ── Bug Tickets (synced from BuggyDemo chat) ──
+  tickets: Record<string, BugTicket>;
+  upsertTicket: (ticket: BugTicket) => void;
 
   // ── Submit Bug modal ──
   submitModalOpen: boolean;
@@ -64,6 +69,13 @@ export const useAppStore = create<AppStoreState>((set) => ({
   // Metrics
   metrics: null,
   setMetrics: (metrics) => set({ metrics }),
+
+  // Bug Tickets (from BuggyDemo chat via WebSocket)
+  tickets: {},
+  upsertTicket: (ticket) =>
+    set((s) => ({
+      tickets: { ...s.tickets, [ticket.id]: ticket },
+    })),
 
   // Submit modal
   submitModalOpen: false,
