@@ -106,18 +106,9 @@ export function validateRepository(path: string): Promise<{ valid: boolean; mess
 
 // ── Bug Tickets (synced from BuggyDemo chat) ──
 
-export interface BugTicket {
-  id: string;
-  title: string;
-  description: string;
-  module: string;
-  severity: string;
-  reporter: string;
-  steps: string;
-  submitted_at: string;
-  status: "pending" | "running" | "complete" | "failed";
-  run_id: string | null;
-}
+// Re-export BugTicket from types for backwards compatibility
+export type { BugTicket } from "@/types";
+import type { BugTicket } from "@/types";
 
 export function fetchTickets(): Promise<BugTicket[]> {
   return request<BugTicket[]>("/tickets");

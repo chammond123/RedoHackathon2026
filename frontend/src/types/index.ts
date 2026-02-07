@@ -163,6 +163,21 @@ export interface LLMUsage {
   total_cost_usd: number;
 }
 
+// ── Ticket (from BuggyDemo) ──
+
+export interface BugTicket {
+  id: string;
+  title: string;
+  description: string;
+  module: string;
+  severity: string;
+  reporter: string;
+  steps: string;
+  submitted_at: string;
+  status: "pending" | "running" | "complete" | "failed";
+  run_id: string | null;
+}
+
 // ── WebSocket Events ──
 
 export type WSEvent =
@@ -170,4 +185,6 @@ export type WSEvent =
   | { type: "log"; request_id: string; entry: LogEntry }
   | { type: "phase_change"; request_id: string; phase: AgentStatus }
   | { type: "run_complete"; request_id: string; status: AgentStatus }
-  | { type: "metrics_update"; metrics: DashboardMetrics };
+  | { type: "metrics_update"; metrics: DashboardMetrics }
+  | { type: "ticket_created"; ticket: BugTicket }
+  | { type: "ticket_updated"; ticket: BugTicket };

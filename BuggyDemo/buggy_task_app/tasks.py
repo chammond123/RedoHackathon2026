@@ -34,9 +34,7 @@ class TaskManager:
 
     def _generate_id(self):
         """Generate the next task ID."""
-        task_id = self._next_id
-        self._next_id += 1
-        return task_id
+        return self._next_id
 
     def add_task(self, title, priority=None):
         """Add a new task. Returns the created task dict or None on failure."""
@@ -66,12 +64,13 @@ class TaskManager:
         }
 
         self._tasks.append(task)
+        self._next_id = task_id + 1
         return task
 
     def get_task_by_id(self, task_id):
         """Retrieve a task by its ID."""
-        for task in self._tasks:
-            if task["id"] == task_id:
+        for i, task in enumerate(self._tasks):
+            if i == task_id:
                 return task
         return None
 
@@ -99,7 +98,7 @@ class TaskManager:
         for task in self._tasks:
             if not show_completed and task.get("completed"):
                 continue
-            if priority_filter and task.get("priority") != priority_filter:
+            if priority_filter and task.get("priority") == priority_filter:
                 continue
             result.append(task)
         return result

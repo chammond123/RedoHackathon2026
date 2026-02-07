@@ -61,5 +61,41 @@
     "description": "When deleting a task and creating a new one, it seems to reuse ID's that are already in place",
     "steps": "",
     "submitted_at": "2026-02-07 14:58:51"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I delete a task and add a new one, it seems to reuse ID's",
+    "description": "When I delete a task and add a new one, it seems to reuse ID's",
+    "steps": "",
+    "submitted_at": "2026-02-07 15:24:38"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I delete a task, and then add another one, it seems to reuse IDs",
+    "description": "When I delete a task, and then add another one, it seems to reuse IDs",
+    "steps": "",
+    "submitted_at": "2026-02-07 15:31:48"
+  },
+  {
+    "reporter": "user@email.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I delete a task, and then add another one, it seems to reuse IDs",
+    "description": "When I delete a task, and then add another one, it seems to reuse IDs",
+    "steps": "",
+    "submitted_at": "2026-02-07 15:52:00"
+  },
+  {
+    "reporter": "user@email.com",
+    "module": "",
+    "severity": "medium",
+    "title": "Hey, when I delete and then add a task, ID's seem to be reused",
+    "description": "Hey, when I delete and then add a task, ID's seem to be reused",
+    "steps": "",
+    "submitted_at": "2026-02-07 15:58:08"
   }
 ]
