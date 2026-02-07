@@ -1,0 +1,12 @@
+langchain<0.4,>=0.3
+langchain-openai<0.4,>=0.3
+langgraph<0.4,>=0.2
+langsmith<0.4,>=0.1
+click<9,>=8.1
+rich<14,>=13.0
+pydantic<3,>=2.0
+
+[dev]
+pytest>=7
+pytest-asyncio>=0.23
+ruff>=0.4

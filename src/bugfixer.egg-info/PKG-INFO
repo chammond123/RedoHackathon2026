@@ -1,3 +1,23 @@
+Metadata-Version: 2.4
+Name: bugfixer
+Version: 0.1.0
+Summary: Agentic debugging system – autonomously reproduce, diagnose, and fix software bugs.
+Author: Hackathon Team
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: langchain<0.4,>=0.3
+Requires-Dist: langchain-openai<0.4,>=0.3
+Requires-Dist: langgraph<0.4,>=0.2
+Requires-Dist: langsmith<0.4,>=0.1
+Requires-Dist: click<9,>=8.1
+Requires-Dist: rich<14,>=13.0
+Requires-Dist: pydantic<3,>=2.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+
 # BugFixer – Agentic Debugging System
 
 An autonomous debugging agent that reproduces, diagnoses, and fixes software bugs.
