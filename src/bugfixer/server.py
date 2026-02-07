@@ -9,11 +9,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
+import traceback
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
@@ -151,11 +157,21 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
     _metrics["active_runs"] += 1
     prev_log_count = 0
     prev_status = ""
+    last_state = state.copy()  # Start with initial state
 
     try:
-        for step in graph.invoke(state, stream_mode="values"):
+        for event in graph.stream(state, {"recursion_limit": 100}):
+            # event is dict like {"node_name": node_output}
+            if not isinstance(event, dict):
+                continue
+            
+            # Merge node outputs into our tracked state
+            for node_name, node_output in event.items():
+                if isinstance(node_output, dict):
+                    last_state.update(node_output)
+                
             # Detect phase transitions
-            cur_status = step.get("status", "")
+            cur_status = last_state.get("status", "")
             if cur_status and cur_status != prev_status:
                 # PUBLIC: user-friendly phase message
                 _emit(run_id, "phase_change", Visibility.PUBLIC, {
@@ -164,12 +180,12 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
                 })
                 # INTERNAL: full state diff
                 _emit(run_id, "state_update", Visibility.INTERNAL, {
-                    "state": step,
+                    "state": last_state,
                 })
                 prev_status = cur_status
 
             # New log entries
-            all_logs = step.get("logs", [])
+            all_logs = last_state.get("logs", [])
             new_logs = all_logs[prev_log_count:]
             prev_log_count = len(all_logs)
             for entry in new_logs:
@@ -183,11 +199,12 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
                     },
                 })
 
-        # Final state
-        final_status = step.get("status", "unknown")  # type: ignore[possibly-undefined]
+        # Final state - use last_state if step isn't a dict
+        final_state = last_state if last_state else {}
+        final_status = final_state.get("status", "unknown")
         _runs[run_id]["status"] = final_status
         _runs[run_id]["updated_at"] = _ts()
-        _runs[run_id]["agent_state"] = step  # type: ignore[possibly-undefined]
+        _runs[run_id]["agent_state"] = final_state
 
         if final_status == "complete":
             _metrics["success_count"] += 1
@@ -197,9 +214,9 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
             })
             # Internal: PR artefacts
             _emit(run_id, "pr_artifacts", Visibility.INTERNAL, {
-                "pr_title": step.get("pr_title", ""),  # type: ignore[possibly-undefined]
-                "pr_summary": step.get("pr_summary", ""),  # type: ignore[possibly-undefined]
-                "patch": step.get("patch", ""),  # type: ignore[possibly-undefined]
+                "pr_title": final_state.get("pr_title", ""),
+                "pr_summary": final_state.get("pr_summary", ""),
+                "patch": final_state.get("patch", ""),
             })
         else:
             _metrics["failure_count"] += 1
@@ -209,8 +226,11 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
             })
 
     except Exception as exc:
+        logger.error(f"Agent run {run_id} failed with error: {exc}")
+        logger.error(traceback.format_exc())
         _runs[run_id]["status"] = "failed"
         _runs[run_id]["updated_at"] = _ts()
+        _runs[run_id]["agent_state"] = {"error": str(exc), "traceback": traceback.format_exc()}
         _metrics["failure_count"] += 1
         _emit(run_id, "run_complete", Visibility.PUBLIC, {
             "status": "failed",
@@ -218,6 +238,7 @@ async def _run_agent(run_id: str, run_data: dict[str, Any]):
         })
         _emit(run_id, "error", Visibility.INTERNAL, {
             "error": str(exc),
+            "traceback": traceback.format_exc(),
         })
     finally:
         _metrics["active_runs"] = max(0, _metrics["active_runs"] - 1)

@@ -35,7 +35,17 @@ def generate_repro_test(state: AgentState) -> dict:
     logs: list[str] = ["[repro_test] Generating reproduction test …"]
     repo = state["repo_path"]
     attempt = state.get("attempt_count", 0) + 1
-    logs.append(f"[repro_test] Attempt #{attempt}")
+    max_attempts = state.get("max_attempts", 5)
+    logs.append(f"[repro_test] Attempt #{attempt} of {max_attempts}")
+
+    # Check if we've exhausted attempts
+    if attempt > max_attempts:
+        logs.append(f"[repro_test] Exhausted {max_attempts} attempts - aborting")
+        return {
+            "attempt_count": attempt,
+            "status": "failed",
+            "logs": logs,
+        }
 
     # Gather context
     snippets: list[str] = []

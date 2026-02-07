@@ -70,8 +70,8 @@ class TaskManager:
 
     def get_task_by_id(self, task_id):
         """Retrieve a task by its ID."""
-        for i, task in enumerate(self._tasks):
-            if i == task_id:
+        for task in self._tasks:
+            if task["id"] == task_id:
                 return task
         return None
 

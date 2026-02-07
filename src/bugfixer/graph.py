@@ -142,3 +142,9 @@ def build_graph() -> StateGraph:
 def compile_graph():
     """Build and compile the graph, returning a runnable."""
     return build_graph().compile()
+
+
+def invoke_graph(state, **kwargs):
+    """Invoke the graph with increased recursion limit."""
+    graph = compile_graph()
+    return graph.invoke(state, {"recursion_limit": 100}, **kwargs)

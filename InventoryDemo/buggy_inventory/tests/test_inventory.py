@@ -104,11 +104,11 @@ class TestInventoryManager:
         """Test that reorder list is sorted alphabetically by priority."""
         # This test PASSES - encodes Bug #15 behavior
         # Priority strings sorted alphabetically: critical < high < low < medium
-        self.manager.add_product("SKU001", "Critical", 10.00, initial_stock=0)
-        self.manager._inventory["sku001"].reorder_point = 10
+        self.manager.add_product("SKU001", "Critical", 10.00, initial_stock=1)
+        self.manager._inventory["sku001"].reorder_point = 10  # ratio 0.1 -> high
         
         self.manager.add_product("SKU002", "Low", 10.00, initial_stock=8)
-        self.manager._inventory["sku002"].reorder_point = 10
+        self.manager._inventory["sku002"].reorder_point = 10  # ratio 0.8 -> low
         
         reorder_list = self.manager.check_reorder_needed()
         # BUG: sorted alphabetically, not by urgency

@@ -146,7 +146,11 @@ app.get("/api/chat/:id/status", requirePublicAuth, async (req, res) => {
 // Catch-all proxy: forward any /api/* (except /api/chat/*) to the agent
 app.all("/api/{*splat}", requireInternalAuth, async (req, res) => {
   // Skip chat routes (already handled by explicit routes above)
-  const fullPath = "/api/" + req.params.splat;
+  // req.params.splat is an array in Express 5, join with "/" to reconstruct path
+  const splatPath = Array.isArray(req.params.splat)
+    ? req.params.splat.join("/")
+    : req.params.splat;
+  const fullPath = "/api/" + splatPath;
   if (fullPath.startsWith("/api/chat")) return res.status(404).json({ error: "Not found" });
 
   try {

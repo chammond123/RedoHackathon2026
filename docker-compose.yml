@@ -49,15 +49,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    # NO ports exposed to host – only reachable via internal network
+    # NO ports exposed to host – only reachable via gateway
     environment:
       OPENAI_API_KEY: "${OPENAI_API_KEY}"
       BUGFIXER_MODEL: "${BUGFIXER_MODEL:-gpt-4o}"
       LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
       LANGSMITH_TRACING: "${LANGSMITH_TRACING:-false}"
       LANGSMITH_PROJECT: "${LANGSMITH_PROJECT:-bugfixer}"
+    volumes:
+      # Mount demo repositories so the agent can analyze and fix them
+      - ./BuggyDemo:/app/BuggyDemo:rw
+      - ./InventoryDemo:/app/InventoryDemo:rw
     networks:
       - internal
+      - egress    # allows outbound internet (OpenAI, LangSmith)
     restart: unless-stopped
 
 networks:
@@ -65,4 +70,6 @@ networks:
     driver: bridge
   internal:
     driver: bridge
-    internal: true   # no external access
+    internal: true   # no external access - gateway<->agent only
+  egress:
+    driver: bridge   # allows outbound internet for agent API calls

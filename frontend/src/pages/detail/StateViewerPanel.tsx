@@ -42,7 +42,7 @@ export function StateViewerPanel({ state }: Props) {
 
         {/* Suspected Files */}
         <StateSection icon={FileCode} title="Suspected Files" color="text-blue-400">
-          {state.suspected_files.length > 0 ? (
+          {state.suspected_files?.length > 0 ? (
             <ul className="space-y-1">
               {state.suspected_files.map((f) => (
                 <li key={f} className="font-mono text-xs text-zinc-400">{f}</li>
@@ -55,7 +55,7 @@ export function StateViewerPanel({ state }: Props) {
 
         {/* Failing Tests */}
         <StateSection icon={FlaskConical} title="Failing Tests" color="text-red-400">
-          {state.failing_tests.length > 0 ? (
+          {state.failing_tests?.length > 0 ? (
             <ul className="space-y-1">
               {state.failing_tests.map((t) => (
                 <li key={t} className="font-mono text-xs text-red-400/80">{t}</li>

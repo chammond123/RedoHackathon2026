@@ -7,5 +7,14 @@
     "description": "Hey I was on the page and this is what I found! (Expected: It should have worked?)",
     "steps": "1. sign into this page,",
     "submitted_at": "2026-02-07 12:16:48"
+  },
+  {
+    "reporter": "Chat User",
+    "module": "unknown",
+    "severity": "medium",
+    "title": "Hey I can't seem to complete my tasks",
+    "description": "Hey I can't seem to complete my tasks\n\nExpected: I expected them to move to completed\n\nSteps to reproduce:\nadd task, click on complete\n\nSuspected module: unknown\nSeverity: medium",
+    "steps": "add task, click on complete",
+    "submitted_at": "2026-02-07 13:46:44"
   }
 ]

@@ -3,10 +3,15 @@
  * ────────────────────────────────────────────────────────── */
 
 const BASE = "/api";
+const API_KEY = import.meta.env.VITE_API_KEY || "internal-dev";
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...opts?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": API_KEY,
+      ...opts?.headers
+    },
     ...opts,
   });
   if (!res.ok) {
