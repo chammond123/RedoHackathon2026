@@ -57,6 +57,20 @@ class AgentState(TypedDict, total=False):
         Markdown summary suitable for a pull-request description.
     pr_title : str
         One-line title suitable for a pull-request.
+    verification_test : str
+        Generated test code to verify the hypothesis.
+    verification_test_name : str
+        Name of the verification test.
+    verification_test_file : str
+        Path to the temporary verification test file.
+    verification_passed_before_patch : bool | None
+        Whether the verification test passed before applying the patch.
+        Should be False if hypothesis is correct.
+    verification_passed_after_patch : bool | None
+        Whether the verification test passed after applying the patch.
+        Should be True if fix is correct.
+    verification_confirms_fix : bool
+        True if verification test failed before patch and passed after.
     """
 
     bug_report: str
@@ -81,6 +95,15 @@ class AgentState(TypedDict, total=False):
     logs: Annotated[list[str], operator.add]
     pr_summary: str
     pr_title: str
+    # Verification test fields
+    verification_test: str
+    verification_test_name: str
+    verification_test_file: str
+    verification_passed_before_patch: bool | None
+    verification_passed_after_patch: bool | None
+    verification_confirms_fix: bool
+    expected_failure_reason: str
+    verification_failure_output: str
 
 
 def initial_state(bug_report: str, repo_path: str, max_attempts: int = 5) -> AgentState:
@@ -106,4 +129,13 @@ def initial_state(bug_report: str, repo_path: str, max_attempts: int = 5) -> Age
         logs=[f"[init] Bug report received. Target repo: {repo_path}"],
         pr_summary="",
         pr_title="",
+        # Verification test defaults
+        verification_test="",
+        verification_test_name="",
+        verification_test_file="",
+        verification_passed_before_patch=None,
+        verification_passed_after_patch=None,
+        verification_confirms_fix=False,
+        expected_failure_reason="",
+        verification_failure_output="",
     )

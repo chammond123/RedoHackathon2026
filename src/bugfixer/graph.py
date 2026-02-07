@@ -21,11 +21,15 @@ Graph topology
   root_cause_analysis
       │
       ▼
+  verify_hypothesis  ◄─── NEW: generates secondary test
+      │                   (should FAIL before fix)
+      ▼
   patch_generation
       │
       ▼
   validation ──────── (fix failed) ──► hypothesis_generation
-      │ (fix passed)
+      │ (fix passed)    │
+      │       verifies secondary test passes after fix
       ▼
   completion
       │
@@ -43,6 +47,7 @@ from bugfixer.nodes.hypothesis import hypothesis_generation
 from bugfixer.nodes.reproduce import reproduction_attempt
 from bugfixer.nodes.analyze import reproduction_analysis
 from bugfixer.nodes.root_cause import root_cause_analysis
+from bugfixer.nodes.verify_hypothesis import verify_hypothesis
 from bugfixer.nodes.patch import patch_generation
 from bugfixer.nodes.validate import validation
 from bugfixer.nodes.complete import completion
@@ -96,6 +101,7 @@ def build_graph() -> StateGraph:
     graph.add_node("reproduction_attempt", reproduction_attempt)
     graph.add_node("reproduction_analysis", reproduction_analysis)
     graph.add_node("root_cause_analysis", root_cause_analysis)
+    graph.add_node("verify_hypothesis", verify_hypothesis)
     graph.add_node("patch_generation", patch_generation)
     graph.add_node("validation", validation)
     graph.add_node("completion", completion)
@@ -121,7 +127,8 @@ def build_graph() -> StateGraph:
     )
 
     # -- Linear edges (post-reproduction) --
-    graph.add_edge("root_cause_analysis", "patch_generation")
+    graph.add_edge("root_cause_analysis", "verify_hypothesis")
+    graph.add_edge("verify_hypothesis", "patch_generation")
     graph.add_edge("patch_generation", "validation")
 
     # -- Conditional: after validation --
