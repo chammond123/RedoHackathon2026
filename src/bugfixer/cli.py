@@ -7,6 +7,7 @@ import sys
 import time
 
 import click
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
@@ -14,6 +15,9 @@ from rich.markdown import Markdown
 from bugfixer.config import configure_langsmith
 from bugfixer.graph import compile_graph
 from bugfixer.state import initial_state
+
+# Load environment variables from .env file
+load_dotenv()
 
 console = Console()
 

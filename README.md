@@ -9,13 +9,11 @@ Built with **LangChain + LangGraph** for a hackathon.
 # Install in editable mode
 pip install -e ".[dev]"
 
-# Set your OpenAI key (required)
-export OPENAI_API_KEY="sk-..."
-
-# Optional: enable LangSmith tracing
-export LANGSMITH_TRACING=true
-export LANGSMITH_API_KEY="ls-..."
-export LANGSMITH_PROJECT="bugfixer"
+# Create a .env file with your environment variables (required)
+# OPENAI_API_KEY="sk-..."
+# LANGSMITH_TRACING=true
+# LANGSMITH_API_KEY="ls-..."
+# LANGSMITH_PROJECT="bugfixer"
 
 # Run the agent
 bugfixer run
