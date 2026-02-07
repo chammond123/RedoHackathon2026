@@ -211,10 +211,11 @@
     //  Configuration
     // ---------------------------------------------------------------
     // Gateway public chat API & local bug-report save endpoint
-    const GATEWAY_URL   = window.BUGFIXER_GATEWAY_URL || 'http://localhost:8000';
+    const GATEWAY_URL   = window.BUGFIXER_GATEWAY_URL || 'http://localhost:3001';
     const LOCAL_API_URL = '/api/bug-report';          // save to Flask too
     const API_KEY       = window.BUGFIXER_API_KEY || '';
-    const REPO_PATH     = window.BUGFIXER_REPO_PATH || '/app/BuggyDemo';
+    // Hardcoded to the path inside the Docker container where the agent runs
+    const REPO_PATH     = '/app/BuggyDemo';
     // ---------------------------------------------------------------
 
     const toggle   = document.getElementById('bug-bubble-toggle');
@@ -325,6 +326,8 @@
             const headers = { 'Content-Type': 'application/json' };
             if (API_KEY) headers['X-API-Key'] = API_KEY;
 
+            console.log('Submitting to:', GATEWAY_URL + '/api/chat/start');
+            
             const resp = await fetch(GATEWAY_URL + '/api/chat/start', {
                 method: 'POST',
                 headers: headers,

@@ -34,7 +34,8 @@ class TaskManager:
 
     def _generate_id(self):
         """Generate the next task ID."""
-        task_id = len(self._tasks) + 1
+        task_id = self._next_id
+        self._next_id += 1
         return task_id
 
     def add_task(self, title, priority=None):
@@ -65,7 +66,6 @@ class TaskManager:
         }
 
         self._tasks.append(task)
-        self._next_id = task_id + 1
         return task
 
     def get_task_by_id(self, task_id):

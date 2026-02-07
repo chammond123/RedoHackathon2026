@@ -1,32 +1,5 @@
 [
   {
-    "reporter": "Chat User",
-    "module": "idk",
-    "severity": "low",
-    "title": "Hey I was on the page and this is what I found!",
-    "description": "Hey I was on the page and this is what I found! (Expected: It should have worked?)",
-    "steps": "1. sign into this page,",
-    "submitted_at": "2026-02-07 12:16:48"
-  },
-  {
-    "reporter": "Chat User",
-    "module": "unknown",
-    "severity": "medium",
-    "title": "Hey I can't seem to complete my tasks",
-    "description": "Hey I can't seem to complete my tasks\n\nExpected: I expected them to move to completed\n\nSteps to reproduce:\nadd task, click on complete\n\nSuspected module: unknown\nSeverity: medium",
-    "steps": "add task, click on complete",
-    "submitted_at": "2026-02-07 13:46:44"
-  },
-  {
-    "reporter": "Chat User",
-    "module": "unknown",
-    "severity": "medium",
-    "title": "When I delete a task and add a new one, it uses the same id as the previous one",
-    "description": "When I delete a task and add a new one, it uses the same id as the previous one\n\nExpected: Generate a new id\n\nSteps to reproduce:\nadd task, delete task, add task\n\nSuspected module: unknown\nSeverity: medium",
-    "steps": "add task, delete task, add task",
-    "submitted_at": "2026-02-07 14:43:06"
-  },
-  {
     "reporter": "teagan.ms.ut@gmail.com",
     "module": "",
     "severity": "medium",
@@ -34,5 +7,59 @@
     "description": "When I purge all tasks, it seems to miss some?",
     "steps": "",
     "submitted_at": "2026-02-07 14:46:04"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I purge my tickets, It seems to miss some?",
+    "description": "When I purge my tickets, It seems to miss some?",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:47:19"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I purge my tasks, some seem to be left over?",
+    "description": "When I purge my tasks, some seem to be left over?",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:50:19"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "when purging all of my tasks, it seems to miss some",
+    "description": "when purging all of my tasks, it seems to miss some",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:52:35"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I delete a task, it seems to reuse ID's",
+    "description": "When I delete a task, it seems to reuse ID's",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:54:01"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When I delete a task, it seems to reuse ID's",
+    "description": "When I delete a task, it seems to reuse ID's",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:56:21"
+  },
+  {
+    "reporter": "teagan.ms.ut@gmail.com",
+    "module": "",
+    "severity": "medium",
+    "title": "When deleting a task and creating a new one, it seems to reuse ID's that are alr",
+    "description": "When deleting a task and creating a new one, it seems to reuse ID's that are already in place",
+    "steps": "",
+    "submitted_at": "2026-02-07 14:58:51"
   }
 ]

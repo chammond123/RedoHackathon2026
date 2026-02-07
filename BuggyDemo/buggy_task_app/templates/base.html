@@ -222,13 +222,14 @@
         {% block content %}{% endblock %}
     </div>
 
-    {% include 'partials/chat_bubble.html' %}
-
     <script>
         // BugFixer gateway configuration (injected by Flask)
+        // MUST be set BEFORE the chat bubble script runs
         window.BUGFIXER_GATEWAY_URL = {{ bugfixer_gateway_url | tojson }};
         window.BUGFIXER_API_KEY     = {{ bugfixer_api_key | tojson }};
         window.BUGFIXER_REPO_PATH   = {{ bugfixer_repo_path | tojson }};
     </script>
+
+    {% include 'partials/chat_bubble.html' %}
 </body>
 </html>

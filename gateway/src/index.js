@@ -12,6 +12,7 @@
  */
 
 import express from "express";
+import cors from "cors";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidv4 } from "uuid";
@@ -24,12 +25,19 @@ const AGENT_URL = process.env.AGENT_URL || "http://agent:8000";
 const API_KEY = process.env.GATEWAY_API_KEY || ""; // empty = no auth
 const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || "internal-dev"; // shared secret for internal API
 
+// Default repo path for the agent (path inside Docker container)
+const DEFAULT_REPO_PATH = process.env.DEFAULT_REPO_PATH || "/app/BuggyDemo";
+
 // ── In-memory bug ticket store (synced to frontend) ──────
 const bugTickets = new Map(); // ticket_id → ticket data
 
 // ── App ──────────────────────────────────────────────────
 
 const app = express();
+
+// Enable CORS for all origins (allows BuggyDemo on localhost:5000 to call gateway on localhost:3001)
+app.use(cors());
+
 app.use(express.json());
 
 const server = createServer(app);
@@ -90,11 +98,15 @@ app.get("/healthz", (_req, res) => res.json({ status: "ok", service: "gateway" }
  * Returns: { chat_id, status, ticket_id? }
  * 
  * If `ticket` object is provided, it will be stored and synced to the frontend.
+ * Note: repo_path from client is ignored; we use the server-configured DEFAULT_REPO_PATH
  */
 app.post("/api/chat/start", requirePublicAuth, async (req, res) => {
   try {
-    const { bug_report, repo_path = ".", ticket } = req.body;
+    const { bug_report, ticket } = req.body;
     if (!bug_report) return res.status(400).json({ error: "bug_report is required" });
+
+    // Always use the server-configured repo path, not the client-provided one
+    const repo_path = DEFAULT_REPO_PATH;
 
     // Store the bug ticket if provided (for frontend dashboard sync)
     let ticketId = null;
