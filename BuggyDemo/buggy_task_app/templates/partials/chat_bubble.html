@@ -1,0 +1,342 @@
+<!-- Floating Bug Report Chat Bubble -->
+<div id="bug-bubble">
+    <button id="bug-bubble-toggle" title="Report a Bug">
+        <span class="bubble-icon">🐛</span>
+        <span class="bubble-close">✕</span>
+    </button>
+
+    <div id="bug-chat-window">
+        <div class="chat-header">
+            <span>🐛 Bug Reporter</span>
+            <button id="chat-reset" title="New conversation">↺</button>
+        </div>
+
+        <div id="chat-messages">
+            <div class="chat-msg bot">
+                <div class="msg-bubble">
+                    Hi! I'm the bug report assistant. Describe the bug you found and I'll help you file a report.<br><br>
+                    <em>What went wrong?</em>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Describe the bug…" autocomplete="off">
+            <button id="chat-send">➤</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    #bug-bubble {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        z-index: 9999;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #bug-bubble-toggle {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #e94560;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(233,69,96,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    #bug-bubble-toggle:hover {
+        transform: scale(1.08);
+        box-shadow: 0 6px 20px rgba(233,69,96,0.5);
+    }
+
+    .bubble-icon, .bubble-close { font-size: 1.5rem; }
+    .bubble-close { display: none; color: #fff; font-size: 1.2rem; }
+    #bug-bubble.open .bubble-icon { display: none; }
+    #bug-bubble.open .bubble-close { display: block; }
+
+    #bug-chat-window {
+        display: none;
+        position: absolute;
+        bottom: 70px;
+        right: 0;
+        width: 370px;
+        max-height: 520px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        overflow: hidden;
+        flex-direction: column;
+    }
+
+    #bug-bubble.open #bug-chat-window {
+        display: flex;
+    }
+
+    .chat-header {
+        background: #16213e;
+        color: #fff;
+        padding: 0.75rem 1rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .chat-header button {
+        background: none;
+        border: none;
+        color: #a8b2d1;
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0;
+    }
+
+    .chat-header button:hover { color: #fff; }
+
+    #chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        max-height: 340px;
+        min-height: 200px;
+    }
+
+    .chat-msg {
+        margin-bottom: 0.75rem;
+        display: flex;
+    }
+
+    .chat-msg.bot { justify-content: flex-start; }
+    .chat-msg.user { justify-content: flex-end; }
+
+    .msg-bubble {
+        max-width: 85%;
+        padding: 0.6rem 0.85rem;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        line-height: 1.45;
+        word-wrap: break-word;
+    }
+
+    .chat-msg.bot .msg-bubble {
+        background: #f0f2f5;
+        color: #1a1a2e;
+        border-bottom-left-radius: 4px;
+    }
+
+    .chat-msg.user .msg-bubble {
+        background: #0a3d62;
+        color: #fff;
+        border-bottom-right-radius: 4px;
+    }
+
+    #chat-input-area {
+        display: flex;
+        border-top: 1px solid #eee;
+        padding: 0.5rem;
+        gap: 0.4rem;
+    }
+
+    #chat-input {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        font-size: 0.88rem;
+        outline: none;
+        font-family: inherit;
+        margin: 0;
+    }
+
+    #chat-input:focus { border-color: #0a3d62; }
+
+    #chat-send {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #0a3d62;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    #chat-send:hover { background: #0c4a75; }
+    #chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    @media (max-width: 480px) {
+        #bug-chat-window { width: calc(100vw - 2rem); right: -0.5rem; }
+    }
+</style>
+
+<script>
+(function() {
+    // ---------------------------------------------------------------
+    //  Configuration — point this at your external bug report API
+    // ---------------------------------------------------------------
+    const BUG_REPORT_API = {
+        url:    '/api/bug-report',                 // POST endpoint URL
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // 'Authorization': 'Bearer <TOKEN>',  // add auth headers as needed
+        },
+        // Transform the collected report into whatever payload shape
+        // your external API expects.  Default forwards it as-is.
+        buildPayload: function(report) {
+            return JSON.stringify(report);
+            // Example for a different schema:
+            // return JSON.stringify({
+            //     project: 'buggy-task-manager',
+            //     issue: {
+            //         summary:     report.title,
+            //         description: report.description,
+            //         repro_steps: report.steps,
+            //         component:   report.module,
+            //         priority:    report.severity,
+            //     }
+            // });
+        },
+    };
+    // ---------------------------------------------------------------
+
+    const toggle   = document.getElementById('bug-bubble-toggle');
+    const bubble   = document.getElementById('bug-bubble');
+    const input    = document.getElementById('chat-input');
+    const sendBtn  = document.getElementById('chat-send');
+    const messages = document.getElementById('chat-messages');
+    const resetBtn = document.getElementById('chat-reset');
+
+    let step    = 0;
+    let answers = [];
+
+    toggle.addEventListener('click', function() {
+        bubble.classList.toggle('open');
+        if (bubble.classList.contains('open')) {
+            setTimeout(() => input.focus(), 100);
+        }
+    });
+
+    function addMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = 'chat-msg ' + sender;
+        const bub = document.createElement('div');
+        bub.className = 'msg-bubble';
+        bub.innerHTML = text;
+        div.appendChild(bub);
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    function botReply(text) {
+        addMessage(text, 'bot');
+    }
+
+    function getReply(userMessage) {
+        switch (step) {
+            case 0:
+                return 'Got it \u2014 "' + userMessage + '".<br><br>What did you <em>expect</em> to happen instead?';
+            case 1:
+                return 'Thanks. Can you list the <strong>steps to reproduce</strong> this bug?<br><small>(e.g. "1. Add a task &nbsp;2. Delete it &nbsp;3. Add another")</small>';
+            case 2:
+                return 'Which module do you think is affected?<br><br>' +
+                    '<small>Options: <code>tasks.py</code> \u00b7 <code>storage.py</code> \u00b7 <code>utils.py</code> \u00b7 <code>app.py</code> \u00b7 <code>constants.py</code> \u00b7 <code>unknown</code></small>';
+            case 3:
+                return 'And how severe is this?<br><br>' +
+                    '<small><strong>low</strong> \u00b7 <strong>medium</strong> \u00b7 <strong>high</strong> \u00b7 <strong>critical</strong></small>';
+            case 4:
+                return '\u2705 Submitting your bug report\u2026';
+            default:
+                return null;
+        }
+    }
+
+    function buildReport() {
+        return {
+            title:       answers[0].substring(0, 80),
+            description: answers[0] + ' (Expected: ' + answers[1] + ')',
+            steps:       answers[2],
+            module:      answers[3],
+            severity:    answers[4].toLowerCase(),
+            reporter:    'Chat User',
+        };
+    }
+
+    async function submitReport(report) {
+        try {
+            const resp = await fetch(BUG_REPORT_API.url, {
+                method:  BUG_REPORT_API.method,
+                headers: BUG_REPORT_API.headers,
+                body:    BUG_REPORT_API.buildPayload(report),
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(function() { return {}; });
+                throw new Error(err.error || 'Server returned ' + resp.status);
+            }
+
+            botReply(
+                '\u2705 Report submitted!<br><br>' +
+                '<strong>Bug:</strong> ' + report.title + '<br>' +
+                '<strong>Expected:</strong> ' + answers[1] + '<br>' +
+                '<strong>Steps:</strong> ' + answers[2] + '<br>' +
+                '<strong>Module:</strong> ' + report.module + '<br>' +
+                '<strong>Severity:</strong> ' + report.severity + '<br><br>' +
+                '<em>You can report another bug or close this chat.</em>'
+            );
+        } catch (err) {
+            botReply('\u26a0\ufe0f Failed to submit: ' + err.message);
+        }
+    }
+
+    async function handleSend() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        input.value = '';
+        addMessage(text, 'user');
+        sendBtn.disabled = true;
+
+        answers.push(text);
+        var reply = getReply(text);
+        if (reply) botReply(reply);
+
+        if (step === 4) {
+            await submitReport(buildReport());
+            step = 0;
+            answers = [];
+        } else {
+            step++;
+        }
+
+        sendBtn.disabled = false;
+        input.focus();
+    }
+
+    sendBtn.addEventListener('click', handleSend);
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    });
+
+    resetBtn.addEventListener('click', function() {
+        step = 0;
+        answers = [];
+        messages.innerHTML = '';
+        botReply('Hi! I\'m the bug report assistant. Describe the bug you found and I\'ll help you file a report.<br><br><em>What went wrong?</em>');
+    });
+})();
+</script>

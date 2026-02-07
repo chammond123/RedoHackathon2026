@@ -1,0 +1,11 @@
+[
+  {
+    "reporter": "Chat User",
+    "module": "idk",
+    "severity": "low",
+    "title": "Hey I was on the page and this is what I found!",
+    "description": "Hey I was on the page and this is what I found! (Expected: It should have worked?)",
+    "steps": "1. sign into this page,",
+    "submitted_at": "2026-02-07 12:16:48"
+  }
+]

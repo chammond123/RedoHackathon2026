@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks — Buggy Task Manager{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-box">
+        <div class="num">{{ stats.total }}</div>
+        <div class="lbl">Total</div>
+    </div>
+    <div class="stat-box">
+        <div class="num">{{ stats.pending }}</div>
+        <div class="lbl">Pending</div>
+    </div>
+    <div class="stat-box">
+        <div class="num">{{ stats.completed }}</div>
+        <div class="lbl">Completed</div>
+    </div>
+</div>
+
+<!-- Add Task -->
+<div class="card">
+    <h2>Add a Task</h2>
+    <form method="POST" action="/add">
+        <div class="form-row">
+            <div class="grow">
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" placeholder="What needs to be done?">
+            </div>
+            <div>
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary" style="margin-bottom: 0.75rem;">Add</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Task List -->
+<div class="card">
+    <h2>Tasks</h2>
+
+    <div class="filter-bar">
+        <a href="/?filter=all" class="{{ 'active' if filter_type == 'all' }}">All</a>
+        <a href="/?filter=pending" class="{{ 'active' if filter_type == 'pending' }}">Pending</a>
+        <a href="/?filter=completed" class="{{ 'active' if filter_type == 'completed' }}">Completed</a>
+    </div>
+
+    {% if tasks %}
+    <table>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Priority</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td>
+                    {% if task.completed %}
+                        <span class="status-done">✓</span>
+                    {% else %}
+                        <span class="status-pending">○</span>
+                    {% endif %}
+                </td>
+                <td>{{ task.id }}</td>
+                <td>{{ task.title }}</td>
+                <td>{{ task.priority }}</td>
+                <td>{{ task.created_at }}</td>
+                <td>
+                    {% if not task.completed %}
+                    <form method="POST" action="/complete/{{ task.id }}" style="display:inline;">
+                        <button type="submit" class="btn btn-success btn-sm">Done</button>
+                    </form>
+                    {% endif %}
+                    <form method="POST" action="/delete/{{ task.id }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No tasks yet. Add one above!</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Purge -->
+{% if stats.completed > 0 %}
+<div class="card" style="text-align: center;">
+    <form method="POST" action="/purge">
+        <button type="submit" class="btn btn-danger">Purge All Completed Tasks</button>
+    </form>
+</div>
+{% endif %}
+
+{% endblock %}

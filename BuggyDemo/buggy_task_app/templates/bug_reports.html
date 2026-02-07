@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Bug Reports — Buggy Task Manager{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <h2>🐛 Submitted Bug Reports</h2>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:1rem;">
+        Use the chat bubble in the bottom-right corner to report a new bug.
+    </p>
+
+    {% if reports %}
+    <table>
+        <thead>
+            <tr>
+                <th>Severity</th>
+                <th>Title</th>
+                <th>Module</th>
+                <th>Submitted</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in reports | reverse %}
+            <tr>
+                <td>
+                    <span style="display:inline-block;padding:0.15rem 0.5rem;border-radius:3px;font-size:0.75rem;
+                        background:{{ '#f8d7da' if r.severity in ('high','critical') else '#fff3cd' if r.severity == 'medium' else '#d4edda' }};
+                        color:{{ '#721c24' if r.severity in ('high','critical') else '#856404' if r.severity == 'medium' else '#155724' }};">
+                        {{ r.severity }}
+                    </span>
+                </td>
+                <td>
+                    <strong>{{ r.title }}</strong>
+                    {% if r.description %}
+                    <div style="font-size:0.82rem;color:#666;margin-top:0.2rem;">{{ r.description[:120] }}{% if r.description|length > 120 %}…{% endif %}</div>
+                    {% endif %}
+                </td>
+                <td><code style="font-size:0.82rem;">{{ r.module or '—' }}</code></td>
+                <td style="font-size:0.82rem;white-space:nowrap;">{{ r.submitted_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No bug reports yet. Click the 🐛 bubble to submit one!</p>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Bug Report — Buggy Task Manager{% endblock %}
+
+{% block content %}
+
+<!-- Submit a Bug Report -->
+<div class="card">
+    <h2>🐛 Submit a Bug Report</h2>
+    <form method="POST" action="/bug-report">
+        <div class="form-row">
+            <div class="grow">
+                <label for="reporter">Your Name</label>
+                <input type="text" id="reporter" name="reporter"
+                       placeholder="Anonymous"
+                       value="{{ report.reporter if report else '' }}">
+            </div>
+            <div class="grow">
+                <label for="module">Module</label>
+                <select id="module" name="module">
+                    <option value="">(select)</option>
+                    <option value="tasks.py" {{ 'selected' if report and report.module == 'tasks.py' }}>tasks.py</option>
+                    <option value="storage.py" {{ 'selected' if report and report.module == 'storage.py' }}>storage.py</option>
+                    <option value="utils.py" {{ 'selected' if report and report.module == 'utils.py' }}>utils.py</option>
+                    <option value="app.py" {{ 'selected' if report and report.module == 'app.py' }}>app.py</option>
+                    <option value="constants.py" {{ 'selected' if report and report.module == 'constants.py' }}>constants.py</option>
+                    <option value="other" {{ 'selected' if report and report.module == 'other' }}>Other</option>
+                </select>
+            </div>
+            <div>
+                <label for="severity">Severity</label>
+                <select id="severity" name="severity">
+                    <option value="low" {{ 'selected' if report and report.severity == 'low' }}>Low</option>
+                    <option value="medium" {{ 'selected' if report and report.severity == 'medium' else 'selected' if not report }}>Medium</option>
+                    <option value="high" {{ 'selected' if report and report.severity == 'high' }}>High</option>
+                    <option value="critical" {{ 'selected' if report and report.severity == 'critical' }}>Critical</option>
+                </select>
+            </div>
+        </div>
+
+        <label for="title">Bug Title</label>
+        <input type="text" id="title" name="title"
+               placeholder="Short summary of the issue"
+               value="{{ report.title if report else '' }}">
+
+        <label for="description">Description</label>
+        <textarea id="description" name="description"
+                  placeholder="What went wrong? What did you expect to happen?">{{ report.description if report else '' }}</textarea>
+
+        <label for="steps">Steps to Reproduce</label>
+        <textarea id="steps" name="steps"
+                  placeholder="1. Do this&#10;2. Then this&#10;3. Observe that...">{{ report.steps if report else '' }}</textarea>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 0.5rem;">Submit Report</button>
+    </form>
+</div>
+
+<!-- Previous Reports -->
+<div class="card">
+    <h2>Submitted Reports</h2>
+
+    {% if reports %}
+        {% for r in reports | reverse %}
+        <div class="report-card">
+            <strong>{{ r.title }}</strong>
+            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.75rem;
+                background: {{ '#f8d7da' if r.severity in ('high','critical') else '#fff3cd' if r.severity == 'medium' else '#d4edda' }};
+                color: {{ '#721c24' if r.severity in ('high','critical') else '#856404' if r.severity == 'medium' else '#155724' }};">
+                {{ r.severity }}
+            </span>
+            <p style="margin-top: 0.4rem;">{{ r.description }}</p>
+            <div class="meta">
+                {{ r.reporter or 'Anonymous' }} · {{ r.module or 'N/A' }} · {{ r.submitted_at }}
+            </div>
+            {% if r.steps %}
+            <details style="margin-top: 0.4rem; font-size: 0.85rem;">
+                <summary>Steps to reproduce</summary>
+                <pre style="white-space: pre-wrap; margin-top: 0.3rem; color: #555;">{{ r.steps }}</pre>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <p>No bug reports submitted yet.</p>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
