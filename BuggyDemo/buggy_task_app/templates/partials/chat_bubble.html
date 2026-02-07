@@ -183,32 +183,13 @@
 <script>
 (function() {
     // ---------------------------------------------------------------
-    //  Configuration — point this at your external bug report API
+    //  Configuration
     // ---------------------------------------------------------------
-    const BUG_REPORT_API = {
-        url:    '/api/bug-report',                 // POST endpoint URL
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            // 'Authorization': 'Bearer <TOKEN>',  // add auth headers as needed
-        },
-        // Transform the collected report into whatever payload shape
-        // your external API expects.  Default forwards it as-is.
-        buildPayload: function(report) {
-            return JSON.stringify(report);
-            // Example for a different schema:
-            // return JSON.stringify({
-            //     project: 'buggy-task-manager',
-            //     issue: {
-            //         summary:     report.title,
-            //         description: report.description,
-            //         repro_steps: report.steps,
-            //         component:   report.module,
-            //         priority:    report.severity,
-            //     }
-            // });
-        },
-    };
+    // Gateway public chat API & local bug-report save endpoint
+    const GATEWAY_URL   = window.BUGFIXER_GATEWAY_URL || 'http://localhost:3001';
+    const LOCAL_API_URL = '/api/bug-report';          // save to Flask too
+    const API_KEY       = window.BUGFIXER_API_KEY || '';
+    const REPO_PATH     = window.BUGFIXER_REPO_PATH || '/app/BuggyDemo';
     // ---------------------------------------------------------------
 
     const toggle   = document.getElementById('bug-bubble-toggle');
@@ -218,8 +199,25 @@
     const messages = document.getElementById('chat-messages');
     const resetBtn = document.getElementById('chat-reset');
 
-    let step    = 0;
-    let answers = [];
+    let step      = 0;   // conversation step
+    let answers   = [];
+    let chatId    = null; // active agent run id
+    let ws        = null; // WebSocket for live updates
+    let agentDone = false;
+
+    // ── Phase icons for agent progress ──
+    const PHASE_ICONS = {
+        intake:       '🔍',
+        hypothesizing:'💡',
+        reproducing:  '🔄',
+        analyzing:    '🧪',
+        root_cause:   '🎯',
+        patching:     '🩹',
+        validating:   '✅',
+        complete:     '🎉',
+        failed:       '❌',
+        pending:      '⏳',
+    };
 
     toggle.addEventListener('click', function() {
         bubble.classList.toggle('open');
@@ -239,10 +237,22 @@
         messages.scrollTop = messages.scrollHeight;
     }
 
-    function botReply(text) {
-        addMessage(text, 'bot');
+    function botReply(text) { addMessage(text, 'bot'); }
+    function systemReply(text) {
+        const div = document.createElement('div');
+        div.className = 'chat-msg bot';
+        const bub = document.createElement('div');
+        bub.className = 'msg-bubble';
+        bub.style.background = '#e8f4fd';
+        bub.style.borderLeft = '3px solid #0a3d62';
+        bub.style.fontSize = '0.82rem';
+        bub.innerHTML = text;
+        div.appendChild(bub);
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
     }
 
+    // ── Conversation flow (5 steps → collect bug info) ──
     function getReply(userMessage) {
         switch (step) {
             case 0:
@@ -256,16 +266,20 @@
                 return 'And how severe is this?<br><br>' +
                     '<small><strong>low</strong> \u00b7 <strong>medium</strong> \u00b7 <strong>high</strong> \u00b7 <strong>critical</strong></small>';
             case 4:
-                return '\u2705 Submitting your bug report\u2026';
+                return '⏳ Submitting to BugFixer agent\u2026';
             default:
                 return null;
         }
     }
 
-    function buildReport() {
+    function buildBugReport() {
+        const desc = answers[0] + '\n\nExpected: ' + answers[1]
+                   + '\n\nSteps to reproduce:\n' + answers[2]
+                   + '\n\nSuspected module: ' + answers[3]
+                   + '\nSeverity: ' + answers[4];
         return {
             title:       answers[0].substring(0, 80),
-            description: answers[0] + ' (Expected: ' + answers[1] + ')',
+            description: desc,
             steps:       answers[2],
             module:      answers[3],
             severity:    answers[4].toLowerCase(),
@@ -273,33 +287,148 @@
         };
     }
 
+    // ── Save locally to Flask AND dispatch to BugFixer agent ──
     async function submitReport(report) {
+        // 1) Save to local Flask endpoint (fire-and-forget)
+        fetch(LOCAL_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(report),
+        }).catch(function() { /* ok if local save fails */ });
+
+        // 2) Start an agent run via the gateway's public chat API
         try {
-            const resp = await fetch(BUG_REPORT_API.url, {
-                method:  BUG_REPORT_API.method,
-                headers: BUG_REPORT_API.headers,
-                body:    BUG_REPORT_API.buildPayload(report),
+            const headers = { 'Content-Type': 'application/json' };
+            if (API_KEY) headers['X-API-Key'] = API_KEY;
+
+            const resp = await fetch(GATEWAY_URL + '/api/chat/start', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    bug_report: report.description,
+                    repo_path:  REPO_PATH,
+                }),
             });
 
             if (!resp.ok) {
                 const err = await resp.json().catch(function() { return {}; });
-                throw new Error(err.error || 'Server returned ' + resp.status);
+                throw new Error(err.error || 'Gateway returned ' + resp.status);
             }
 
+            const data = await resp.json();
+            chatId = data.chat_id;
+            agentDone = false;
+
             botReply(
-                '\u2705 Report submitted!<br><br>' +
+                '✅ Bug report submitted!<br><br>' +
                 '<strong>Bug:</strong> ' + report.title + '<br>' +
-                '<strong>Expected:</strong> ' + answers[1] + '<br>' +
-                '<strong>Steps:</strong> ' + answers[2] + '<br>' +
                 '<strong>Module:</strong> ' + report.module + '<br>' +
                 '<strong>Severity:</strong> ' + report.severity + '<br><br>' +
-                '<em>You can report another bug or close this chat.</em>'
+                '🤖 <strong>BugFixer agent started</strong> (run <code>' + chatId.substring(0, 8) + '…</code>)<br>' +
+                '<em>I\'ll stream live progress below…</em>'
             );
+
+            // 3) Open a public WebSocket to receive live agent updates
+            connectWebSocket(chatId);
+
         } catch (err) {
-            botReply('\u26a0\ufe0f Failed to submit: ' + err.message);
+            botReply('⚠️ Failed to start agent: ' + err.message + '<br><br><em>The bug report was saved locally.</em>');
         }
     }
 
+    // ── WebSocket for real-time agent progress ──
+    function connectWebSocket(runId) {
+        if (ws) { ws.close(); ws = null; }
+
+        const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = GATEWAY_URL.replace(/^http/, 'ws') + '/ws/chat/' + runId;
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+            systemReply('📡 Connected — watching agent progress…');
+        };
+
+        ws.onmessage = function(evt) {
+            try {
+                const event = JSON.parse(evt.data);
+                handleAgentEvent(event);
+            } catch(e) { /* ignore */ }
+        };
+
+        ws.onclose = function() {
+            if (!agentDone) {
+                systemReply('📡 Connection closed.');
+            }
+        };
+
+        ws.onerror = function() {
+            systemReply('⚠️ WebSocket error — checking status via polling…');
+            ws.close();
+            startStatusPolling(runId);
+        };
+    }
+
+    function handleAgentEvent(event) {
+        switch (event.type) {
+            case 'connected':
+                // initial handshake, ignore
+                break;
+
+            case 'phase_change': {
+                const icon = PHASE_ICONS[event.phase] || '▶';
+                const msg = event.message || ('Phase: ' + event.phase);
+                systemReply(icon + ' ' + msg);
+                break;
+            }
+
+            case 'run_complete': {
+                agentDone = true;
+                const icon = event.status === 'complete' ? '🎉' : '❌';
+                const msg = event.message || (event.status === 'complete'
+                    ? 'Bug fixed successfully!'
+                    : 'Agent could not fix the bug.');
+                botReply(
+                    icon + ' <strong>' + msg + '</strong><br><br>' +
+                    '<em>You can report another bug or close this chat.</em>'
+                );
+                if (ws) { ws.close(); ws = null; }
+                break;
+            }
+
+            default:
+                // Other public events — show message if present
+                if (event.message) {
+                    systemReply(event.message);
+                }
+        }
+    }
+
+    // ── Fallback: poll status if WebSocket fails ──
+    function startStatusPolling(runId) {
+        const headers = {};
+        if (API_KEY) headers['X-API-Key'] = API_KEY;
+
+        const poll = setInterval(async function() {
+            try {
+                const resp = await fetch(GATEWAY_URL + '/api/chat/' + runId + '/status', { headers });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                if (data.status === 'complete' || data.status === 'failed') {
+                    clearInterval(poll);
+                    agentDone = true;
+                    const icon = data.status === 'complete' ? '🎉' : '❌';
+                    botReply(icon + ' <strong>Agent finished: ' + data.status + '</strong>');
+                }
+            } catch(e) { /* keep polling */ }
+        }, 3000);
+
+        // Safety: stop after 10 min
+        setTimeout(function() { clearInterval(poll); }, 600000);
+    }
+
+    // ── Chat input handler ──
     async function handleSend() {
         const text = input.value.trim();
         if (!text) return;
@@ -308,12 +437,34 @@
         addMessage(text, 'user');
         sendBtn.disabled = true;
 
+        // If agent is running, allow follow-up messages
+        if (chatId && !agentDone) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (API_KEY) headers['X-API-Key'] = API_KEY;
+
+            try {
+                const resp = await fetch(GATEWAY_URL + '/api/chat/' + chatId + '/message', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ content: text }),
+                });
+                const data = await resp.json();
+                if (data.content) botReply(data.content);
+            } catch(e) {
+                botReply('⚠️ Could not send message: ' + e.message);
+            }
+            sendBtn.disabled = false;
+            input.focus();
+            return;
+        }
+
+        // Normal conversation flow
         answers.push(text);
         var reply = getReply(text);
         if (reply) botReply(reply);
 
         if (step === 4) {
-            await submitReport(buildReport());
+            await submitReport(buildBugReport());
             step = 0;
             answers = [];
         } else {
@@ -335,6 +486,9 @@
     resetBtn.addEventListener('click', function() {
         step = 0;
         answers = [];
+        chatId = null;
+        agentDone = false;
+        if (ws) { ws.close(); ws = null; }
         messages.innerHTML = '';
         botReply('Hi! I\'m the bug report assistant. Describe the bug you found and I\'ll help you file a report.<br><br><em>What went wrong?</em>');
     });

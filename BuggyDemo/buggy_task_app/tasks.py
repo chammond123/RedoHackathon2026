@@ -99,7 +99,7 @@ class TaskManager:
         for task in self._tasks:
             if not show_completed and task.get("completed"):
                 continue
-            if priority_filter and task.get("priority") == priority_filter:
+            if priority_filter and task.get("priority") != priority_filter:
                 continue
             result.append(task)
         return result

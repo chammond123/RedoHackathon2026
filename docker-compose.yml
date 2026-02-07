@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────
+# BugFixer – Docker Compose
+# ─────────────────────────────────────────────────────────
+#
+# Architecture:
+#   frontend (nginx:3000)  ──►  gateway (node:3001)  ──►  agent (python:8000)
+#
+#   • frontend & gateway are on the "public" network
+#   • gateway & agent are on the "internal" network
+#   • agent is NEVER exposed to the host / external world
+# ─────────────────────────────────────────────────────────
+
+services:
+
+  # ── React Frontend ─────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - public
+    restart: unless-stopped
+
+  # ── Node.js API Gateway ────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "3001:3001"
+    depends_on:
+      - agent
+    environment:
+      GATEWAY_PORT: "3001"
+      AGENT_URL: "http://agent:8000"
+      GATEWAY_API_KEY: "${GATEWAY_API_KEY:-}"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:-internal-dev}"
+    networks:
+      - public
+      - internal
+    restart: unless-stopped
+
+  # ── Python Agent (internal only) ───────────────────────
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    # NO ports exposed to host – only reachable via internal network
+    environment:
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      BUGFIXER_MODEL: "${BUGFIXER_MODEL:-gpt-4o}"
+      LANGSMITH_API_KEY: "${LANGSMITH_API_KEY:-}"
+      LANGSMITH_TRACING: "${LANGSMITH_TRACING:-false}"
+      LANGSMITH_PROJECT: "${LANGSMITH_PROJECT:-bugfixer}"
+    networks:
+      - internal
+    restart: unless-stopped
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true   # no external access

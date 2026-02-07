@@ -97,11 +97,26 @@ def _extract(text: str, prefix: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.upper().startswith(prefix.upper()):
-            return stripped.split(":", 1)[1].strip()
+            value = stripped.split(":", 1)[1].strip()
+            return _clean_command(value)
     # Fallback: return everything after the prefix marker
     if prefix.rstrip(":").upper() in text.upper():
         idx = text.upper().index(prefix.rstrip(":").upper())
         rest = text[idx:].split("\n", 1)
         if len(rest) > 0:
-            return rest[0].split(":", 1)[-1].strip()
-    return text.strip()
+            value = rest[0].split(":", 1)[-1].strip()
+            return _clean_command(value)
+    return _clean_command(text.strip())
+
+
+def _clean_command(cmd: str) -> str:
+    """Strip markdown backtick wrappers the LLM may add around commands."""
+    # Strip triple-backtick code blocks:  ```bash\ncmd\n```
+    if cmd.startswith("```"):
+        lines = cmd.split("\n")
+        # Remove first line (```bash) and last line (```)
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        cmd = "\n".join(lines).strip()
+    # Strip inline backticks:  `cmd`
+    cmd = cmd.strip("`").strip()
+    return cmd
