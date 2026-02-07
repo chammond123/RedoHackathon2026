@@ -26,7 +26,6 @@ _PHASE_ICONS = {
     "intake": "🔍",
     "hypothesizing": "💡",
     "reproducing": "🔄",
-    "analyzing": "🧪",
     "root_cause": "🎯",
     "patching": "🩹",
     "validating": "✅",

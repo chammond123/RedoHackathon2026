@@ -71,6 +71,12 @@ class AgentState(TypedDict, total=False):
         Should be True if fix is correct.
     verification_confirms_fix : bool
         True if verification test failed before patch and passed after.
+    repro_test_code : str
+        Generated reproduction test code.
+    repro_test_file : str
+        Path to the reproduction test file.
+    repro_test_error : str
+        Error from reproduction test if it failed to run (import errors, etc.)
     """
 
     bug_report: str
@@ -104,6 +110,10 @@ class AgentState(TypedDict, total=False):
     verification_confirms_fix: bool
     expected_failure_reason: str
     verification_failure_output: str
+    # Reproduction test fields
+    repro_test_code: str
+    repro_test_file: str
+    repro_test_error: str
 
 
 def initial_state(bug_report: str, repo_path: str, max_attempts: int = 5) -> AgentState:
@@ -138,4 +148,8 @@ def initial_state(bug_report: str, repo_path: str, max_attempts: int = 5) -> Age
         verification_confirms_fix=False,
         expected_failure_reason="",
         verification_failure_output="",
+        # Reproduction test defaults
+        repro_test_code="",
+        repro_test_file="",
+        repro_test_error="",
     )

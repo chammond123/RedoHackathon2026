@@ -25,26 +25,3 @@ def configure_langsmith() -> None:
     if os.getenv("LANGSMITH_API_KEY"):
         os.environ.setdefault("LANGSMITH_TRACING", "true")
         os.environ.setdefault("LANGSMITH_PROJECT", "bugfixer")
-
-
-def get_strict_verification() -> bool:
-    """Check if strict verification mode is enabled.
-    
-    When enabled, the validation step will FAIL if the verification test
-    does not pass after applying the patch. This provides stronger
-    guarantees that fixes actually address the root cause.
-    
-    Set via BUGFIXER_STRICT_VERIFICATION=true environment variable.
-    """
-    return os.getenv("BUGFIXER_STRICT_VERIFICATION", "false").lower() in ("true", "1", "yes")
-
-
-def get_skip_verification() -> bool:
-    """Check if verification test generation should be skipped.
-    
-    When enabled, the verify_hypothesis step will be skipped entirely.
-    Useful for faster runs when you trust the existing tests.
-    
-    Set via BUGFIXER_SKIP_VERIFICATION=true environment variable.
-    """
-    return os.getenv("BUGFIXER_SKIP_VERIFICATION", "false").lower() in ("true", "1", "yes")

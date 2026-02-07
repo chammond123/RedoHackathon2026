@@ -35,6 +35,7 @@ def verify_hypothesis(state: AgentState) -> dict:
             "verification_test_name": "",
             "verification_test_file": "",
             "verification_passed_before_patch": None,
+            "status": "patching",
             "logs": logs,
         }
     
@@ -154,6 +155,7 @@ EXPECTED_FAILURE_REASON: <why this test should fail with the bug present>"""
         "verification_passed_before_patch": passed_before,
         "verification_failure_output": result.combined_output if not passed_before else "",
         "expected_failure_reason": expected_failure,
+        "status": "patching",  # Move to patching phase after verification
         "logs": logs,
     }
 

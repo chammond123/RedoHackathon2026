@@ -9,32 +9,29 @@ Graph topology
   intake_context
       │
       ▼
-  hypothesis_generation  ◄──────────────┐
-      │                                 │
-      ▼                                 │
-  reproduction_attempt                  │
-      │                                 │
-      ▼                                 │
-  reproduction_analysis ── (not reproduced) ─┘
-      │ (reproduced)
+  generate_repro_test  ◄───────────────┐
+      │                                │
+      ▼                                │
+  run_repro_test ──── (not reproduced) ┘
+      │ (reproduced = test FAILS)
       ▼
   root_cause_analysis
       │
       ▼
-  verify_hypothesis  ◄─── NEW: generates secondary test
-      │                   (should FAIL before fix)
-      ▼
   patch_generation
       │
       ▼
-  validation ──────── (fix failed) ──► hypothesis_generation
-      │ (fix passed)    │
-      │       verifies secondary test passes after fix
+  validation ──────── (fix failed) ──► generate_repro_test
+      │ (fix passed = repro test now PASSES)
       ▼
   completion
       │
       ▼
     END
+
+Key insight: The reproduction test asserts CORRECT behavior, so:
+- Test FAILS → bug exists (reproduced) ✓
+- Test PASSES → bug fixed (validated) ✓
 """
 
 from __future__ import annotations
@@ -43,11 +40,8 @@ from langgraph.graph import END, StateGraph
 
 from bugfixer.state import AgentState
 from bugfixer.nodes.intake import intake_context
-from bugfixer.nodes.hypothesis import hypothesis_generation
-from bugfixer.nodes.reproduce import reproduction_attempt
-from bugfixer.nodes.analyze import reproduction_analysis
+from bugfixer.nodes.generate_repro_test import generate_repro_test, run_repro_test
 from bugfixer.nodes.root_cause import root_cause_analysis
-from bugfixer.nodes.verify_hypothesis import verify_hypothesis
 from bugfixer.nodes.patch import patch_generation
 from bugfixer.nodes.validate import validation
 from bugfixer.nodes.complete import completion
@@ -57,15 +51,15 @@ from bugfixer.nodes.complete import completion
 # Routing functions (conditional edges)
 # ---------------------------------------------------------------------------
 
-def _route_after_analysis(state: AgentState) -> str:
-    """After reproduction analysis, decide whether to proceed or retry."""
+def _route_after_repro_test(state: AgentState) -> str:
+    """After running repro test, decide whether bug is reproduced."""
     status = state.get("status", "")
     if status == "root_cause":
         return "root_cause_analysis"
     if status == "failed":
         return "abort"
-    # Default: retry hypothesis
-    return "hypothesis_generation"
+    # Default: retry generating repro test
+    return "generate_repro_test"
 
 
 def _route_after_validation(state: AgentState) -> str:
@@ -75,8 +69,8 @@ def _route_after_validation(state: AgentState) -> str:
         return "completion"
     if status == "failed":
         return "abort"
-    # Default: retry from hypothesis
-    return "hypothesis_generation"
+    # Default: retry from repro test generation
+    return "generate_repro_test"
 
 
 def _abort(state: AgentState) -> dict:
@@ -97,11 +91,9 @@ def build_graph() -> StateGraph:
 
     # -- Add nodes --
     graph.add_node("intake_context", intake_context)
-    graph.add_node("hypothesis_generation", hypothesis_generation)
-    graph.add_node("reproduction_attempt", reproduction_attempt)
-    graph.add_node("reproduction_analysis", reproduction_analysis)
+    graph.add_node("generate_repro_test", generate_repro_test)
+    graph.add_node("run_repro_test", run_repro_test)
     graph.add_node("root_cause_analysis", root_cause_analysis)
-    graph.add_node("verify_hypothesis", verify_hypothesis)
     graph.add_node("patch_generation", patch_generation)
     graph.add_node("validation", validation)
     graph.add_node("completion", completion)
@@ -111,24 +103,22 @@ def build_graph() -> StateGraph:
     graph.set_entry_point("intake_context")
 
     # -- Linear edges --
-    graph.add_edge("intake_context", "hypothesis_generation")
-    graph.add_edge("hypothesis_generation", "reproduction_attempt")
-    graph.add_edge("reproduction_attempt", "reproduction_analysis")
+    graph.add_edge("intake_context", "generate_repro_test")
+    graph.add_edge("generate_repro_test", "run_repro_test")
 
-    # -- Conditional: after reproduction analysis --
+    # -- Conditional: after running repro test --
     graph.add_conditional_edges(
-        "reproduction_analysis",
-        _route_after_analysis,
+        "run_repro_test",
+        _route_after_repro_test,
         {
             "root_cause_analysis": "root_cause_analysis",
-            "hypothesis_generation": "hypothesis_generation",
+            "generate_repro_test": "generate_repro_test",
             "abort": "abort",
         },
     )
 
     # -- Linear edges (post-reproduction) --
-    graph.add_edge("root_cause_analysis", "verify_hypothesis")
-    graph.add_edge("verify_hypothesis", "patch_generation")
+    graph.add_edge("root_cause_analysis", "patch_generation")
     graph.add_edge("patch_generation", "validation")
 
     # -- Conditional: after validation --
@@ -137,7 +127,7 @@ def build_graph() -> StateGraph:
         _route_after_validation,
         {
             "completion": "completion",
-            "hypothesis_generation": "hypothesis_generation",
+            "generate_repro_test": "generate_repro_test",
             "abort": "abort",
         },
     )

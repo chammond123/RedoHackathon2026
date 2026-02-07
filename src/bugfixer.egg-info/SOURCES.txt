@@ -15,12 +15,14 @@ src/bugfixer.egg-info/top_level.txt
 src/bugfixer/nodes/__init__.py
 src/bugfixer/nodes/analyze.py
 src/bugfixer/nodes/complete.py
+src/bugfixer/nodes/generate_repro_test.py
 src/bugfixer/nodes/hypothesis.py
 src/bugfixer/nodes/intake.py
 src/bugfixer/nodes/patch.py
 src/bugfixer/nodes/reproduce.py
 src/bugfixer/nodes/root_cause.py
 src/bugfixer/nodes/validate.py
+src/bugfixer/nodes/verify_hypothesis.py
 src/bugfixer/tools/__init__.py
 src/bugfixer/tools/codebase.py
 src/bugfixer/tools/patch.py
