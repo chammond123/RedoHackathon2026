@@ -5,6 +5,7 @@ src/bugfixer/__main__.py
 src/bugfixer/cli.py
 src/bugfixer/config.py
 src/bugfixer/graph.py
+src/bugfixer/server.py
 src/bugfixer/state.py
 src/bugfixer.egg-info/PKG-INFO
 src/bugfixer.egg-info/SOURCES.txt

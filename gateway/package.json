@@ -1,0 +1,19 @@
+{
+  "name": "bugfixer-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js API gateway – public chat API + internal GUI API + WebSocket visibility filtering",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "http-proxy-middleware": "^3.0.5",
+    "ws": "^8.18.2",
+    "uuid": "^11.1.0",
+    "eventsource": "^3.0.7"
+  }
+}

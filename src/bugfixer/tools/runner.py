@@ -49,8 +49,15 @@ def run_command(
         Extra environment variables merged with ``os.environ``.
     """
     import os
+    import sys
 
     full_env = {**os.environ, **(env or {})}
+    # Ensure the current Python environment's bin dir is on PATH
+    # so tools like pytest are found in subprocesses.
+    venv_bin = os.path.dirname(sys.executable)
+    existing_path = full_env.get("PATH", "")
+    if venv_bin not in existing_path:
+        full_env["PATH"] = f"{venv_bin}:{existing_path}"
     try:
         proc = subprocess.run(
             ["bash", "-c", command],
@@ -98,7 +105,14 @@ def run_tests(
     framework : str
         Test framework command (default ``pytest``).
     """
-    parts = [framework, "-v", "--tb=short"]
+    import sys
+
+    # Use `python -m pytest` to ensure we use the current venv's interpreter,
+    # avoiding "command not found" when pytest isn't on the system PATH.
+    if framework == "pytest":
+        parts = [sys.executable, "-m", "pytest", "-v", "--tb=short"]
+    else:
+        parts = [framework, "-v", "--tb=short"]
     if test_paths:
         parts.extend(test_paths)
     cmd = " ".join(parts)

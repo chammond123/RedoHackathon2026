@@ -17,6 +17,21 @@ manager = TaskManager()
 
 BUG_REPORTS_FILE = "bug_reports.json"
 
+# ── BugFixer gateway config (injected into templates) ──
+BUGFIXER_GATEWAY_URL = os.environ.get("BUGFIXER_GATEWAY_URL", "http://localhost:3001")
+BUGFIXER_API_KEY     = os.environ.get("BUGFIXER_API_KEY", "")
+BUGFIXER_REPO_PATH   = os.environ.get("BUGFIXER_REPO_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
+@app.context_processor
+def inject_bugfixer_config():
+    """Make gateway config available in all templates."""
+    return {
+        "bugfixer_gateway_url": BUGFIXER_GATEWAY_URL,
+        "bugfixer_api_key": BUGFIXER_API_KEY,
+        "bugfixer_repo_path": BUGFIXER_REPO_PATH,
+    }
+
 
 def _load_bug_reports():
     if not os.path.exists(BUG_REPORTS_FILE):
