@@ -15,15 +15,17 @@ export function SubmitBugModal() {
   const [bugReport, setBugReport] = useState("");
   const [repoPath, setRepoPath] = useState("");
   const [mode, setMode] = useState("fix_and_pr");
+  const [email, setEmail] = useState("");
 
   const handleSubmit = () => {
     if (!bugReport.trim()) return;
     submitMutation.mutate(
-      { bug_report: bugReport, repo_path: repoPath || ".", agent_mode: mode },
+      { bug_report: bugReport, repo_path: repoPath || ".", agent_mode: mode, email },
       {
         onSuccess: () => {
           setBugReport("");
           setRepoPath("");
+          setEmail("");
           close();
         },
       },
@@ -40,6 +42,15 @@ export function SubmitBugModal() {
             onChange={(e) => setBugReport(e.target.value)}
             placeholder="Describe the bug. Include error messages, steps to reproduce, and expected behavior…"
             rows={5}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-zinc-400">Your Email (for follow-up)</label>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="your@email.com"
           />
         </div>
         <div className="grid grid-cols-2 gap-4">

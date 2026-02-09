@@ -120,6 +120,7 @@ def api_submit_bug_report():
 
     report = {
         "reporter": data.get("reporter", "Chat User"),
+        "email": data.get("email", ""),
         "module": data.get("module", ""),
         "severity": data.get("severity", "medium"),
         "title": data.get("title", "Untitled"),

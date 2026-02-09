@@ -39,6 +39,12 @@ services:
       AGENT_URL: "http://agent:8000"
       GATEWAY_API_KEY: "${GATEWAY_API_KEY:-}"
       INTERNAL_TOKEN: "${INTERNAL_TOKEN:-internal-dev}"
+      # Email configuration (set SMTP_HOST=ethereal for testing)
+      SMTP_HOST: "${SMTP_HOST:-ethereal}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+      SMTP_FROM: "${SMTP_FROM:-bugfixer@example.com}"
     networks:
       - public
       - internal

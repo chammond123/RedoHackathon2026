@@ -31,6 +31,7 @@ import type {
   LogEntry,
   ToolInvocation,
   LLMUsage,
+  EmailMessage,
 } from "@/types";
 
 // ── Dashboard ──
@@ -57,6 +58,7 @@ export function submitBugReport(data: {
   bug_report: string;
   repo_path: string;
   agent_mode: string;
+  email?: string;
 }): Promise<BugRequest> {
   return request<BugRequest>("/requests", {
     method: "POST",
@@ -122,5 +124,18 @@ export function startTicketRun(ticketId: string, repoPath?: string): Promise<{ t
   return request<{ ticket: BugTicket; run: BugRequest }>(`/tickets/${ticketId}/start`, {
     method: "POST",
     body: JSON.stringify({ repo_path: repoPath }),
+  });
+}
+
+// ── Email Management ──
+
+export function fetchEmailHistory(requestId: string): Promise<EmailMessage[]> {
+  return request<EmailMessage[]>(`/requests/${requestId}/emails`);
+}
+
+export function sendEmail(requestId: string, data: { subject: string; body: string }): Promise<{ success: boolean; email: EmailMessage }> {
+  return request<{ success: boolean; email: EmailMessage }>(`/requests/${requestId}/email`, {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }

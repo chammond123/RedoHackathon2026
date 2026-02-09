@@ -17,6 +17,7 @@ import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidv4 } from "uuid";
 import { EventSource } from "eventsource";
+import nodemailer from "nodemailer";
 
 // ── Config ───────────────────────────────────────────────
 
@@ -28,8 +29,58 @@ const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || "internal-dev"; // shared s
 // Default repo path for the agent (path inside Docker container)
 const DEFAULT_REPO_PATH = process.env.DEFAULT_REPO_PATH || "/app/BuggyDemo";
 
+// ── Email Config ─────────────────────────────────────────
+// Configure via environment variables:
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+// Set SMTP_HOST=ethereal for auto-generated test account
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_FROM = process.env.SMTP_FROM || "bugfixer@example.com";
+
+// Email transporter (initialized async if using ethereal)
+let emailTransporter = null;
+let etherealAccount = null;
+
+async function initEmailTransporter() {
+  if (SMTP_HOST === "ethereal") {
+    // Create a test account on Ethereal
+    etherealAccount = await nodemailer.createTestAccount();
+    emailTransporter = nodemailer.createTransport({
+      host: "smtp.ethereal.email",
+      port: 587,
+      secure: false,
+      auth: {
+        user: etherealAccount.user,
+        pass: etherealAccount.pass,
+      },
+    });
+    console.log(`[Email] Ethereal test account created:`);
+    console.log(`        User: ${etherealAccount.user}`);
+    console.log(`        Pass: ${etherealAccount.pass}`);
+    console.log(`        Preview URL: https://ethereal.email/login`);
+  } else if (SMTP_HOST) {
+    emailTransporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+    });
+    console.log(`[Email] Configured with SMTP host: ${SMTP_HOST}`);
+  } else {
+    console.log(`[Email] Not configured (set SMTP_HOST=ethereal for testing)`);
+  }
+}
+
+// Initialize email on startup
+initEmailTransporter();
+
 // ── In-memory bug ticket store (synced to frontend) ──────
 const bugTickets = new Map(); // ticket_id → ticket data
+
+// ── Email history store (per request) ──────────────────────
+const emailHistory = new Map(); // request_id → [{ id, direction, to, from, subject, body, timestamp, messageId, previewUrl }]
 
 // ── App ──────────────────────────────────────────────────
 
@@ -102,11 +153,14 @@ app.get("/healthz", (_req, res) => res.json({ status: "ok", service: "gateway" }
  */
 app.post("/api/chat/start", requirePublicAuth, async (req, res) => {
   try {
-    const { bug_report, ticket } = req.body;
+    const { bug_report, ticket, email } = req.body;
     if (!bug_report) return res.status(400).json({ error: "bug_report is required" });
 
     // Always use the server-configured repo path, not the client-provided one
     const repo_path = DEFAULT_REPO_PATH;
+
+    // Get email from request body or from ticket
+    const reporterEmail = email || (ticket && ticket.email) || "";
 
     // Store the bug ticket if provided (for frontend dashboard sync)
     let ticketId = null;
@@ -115,6 +169,7 @@ app.post("/api/chat/start", requirePublicAuth, async (req, res) => {
       const storedTicket = {
         id: ticketId,
         ...ticket,
+        email: reporterEmail,
         submitted_at: ticket.submitted_at || now(),
         status: "processing",
         run_id: null, // will be updated after agent starts
@@ -132,7 +187,7 @@ app.post("/api/chat/start", requirePublicAuth, async (req, res) => {
 
     const result = await agentFetch("/api/runs", {
       method: "POST",
-      body: JSON.stringify({ bug_report, repo_path }),
+      body: JSON.stringify({ bug_report, repo_path, email: reporterEmail }),
     });
 
     // Link ticket to the run
@@ -236,6 +291,7 @@ app.post("/api/tickets", requireInternalAuth, (req, res) => {
     module: req.body.module || "",
     severity: req.body.severity || "medium",
     reporter: req.body.reporter || "Unknown",
+    email: req.body.email || "",
     steps: req.body.steps || "",
     submitted_at: now(),
     status: "pending",
@@ -286,6 +342,261 @@ app.post("/api/tickets/:id/start", requireInternalAuth, async (req, res) => {
     res.json({ ticket, run: result });
   } catch (err) {
     res.status(502).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  EMAIL API
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * GET /api/email/status
+ * Check if email is configured
+ */
+app.get("/api/email/status", requireInternalAuth, (_req, res) => {
+  res.json({
+    configured: !!emailTransporter,
+    from: etherealAccount ? etherealAccount.user : SMTP_FROM,
+    ethereal: etherealAccount ? {
+      user: etherealAccount.user,
+      pass: etherealAccount.pass,
+      webUrl: "https://ethereal.email/login",
+    } : null,
+  });
+});
+
+/**
+ * POST /api/email/send
+ * Send an email to a bug reporter
+ * Body: { to, subject, body, request_id? }
+ */
+app.post("/api/email/send", requireInternalAuth, async (req, res) => {
+  if (!emailTransporter) {
+    return res.status(503).json({
+      error: "Email not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS environment variables.",
+    });
+  }
+
+  const { to, subject, body, request_id } = req.body;
+
+  if (!to || !subject || !body) {
+    return res.status(400).json({ error: "Missing required fields: to, subject, body" });
+  }
+
+  try {
+    const info = await emailTransporter.sendMail({
+      from: etherealAccount ? etherealAccount.user : SMTP_FROM,
+      to,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+    });
+
+    console.log(`[Email] Sent to ${to}: ${info.messageId}`);
+
+    // Get preview URL for Ethereal
+    const previewUrl = etherealAccount ? nodemailer.getTestMessageUrl(info) : null;
+    if (previewUrl) {
+      console.log(`[Email] Preview URL: ${previewUrl}`);
+    }
+
+    // Store in history if request_id provided
+    const emailRecord = {
+      id: uuidv4(),
+      direction: "outbound",
+      from: etherealAccount ? etherealAccount.user : SMTP_FROM,
+      to,
+      subject,
+      body,
+      timestamp: now(),
+      messageId: info.messageId,
+      previewUrl,
+    };
+
+    if (request_id) {
+      if (!emailHistory.has(request_id)) {
+        emailHistory.set(request_id, []);
+      }
+      emailHistory.get(request_id).push(emailRecord);
+
+      // Broadcast to connected clients
+      broadcastEvent({
+        type: "email_sent",
+        visibility: "INTERNAL",
+        request_id,
+        email: emailRecord,
+        timestamp: now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      messageId: info.messageId,
+      to,
+      subject,
+      previewUrl,
+      email: emailRecord,
+    });
+  } catch (err) {
+    console.error(`[Email] Failed to send to ${to}:`, err.message);
+    res.status(500).json({ error: `Failed to send email: ${err.message}` });
+  }
+});
+
+/**
+ * GET /api/requests/:request_id/emails
+ * Get email history for a request
+ */
+app.get("/api/requests/:request_id/emails", requireInternalAuth, (req, res) => {
+  const { request_id } = req.params;
+  const history = emailHistory.get(request_id) || [];
+  res.json(history);
+});
+
+/**
+ * POST /api/requests/:request_id/email
+ * Send an email to the reporter and store in history
+ * Body: { subject, body }
+ */
+app.post("/api/requests/:request_id/email", requireInternalAuth, async (req, res) => {
+  if (!emailTransporter) {
+    return res.status(503).json({
+      error: "Email not configured. Set SMTP_HOST environment variable.",
+    });
+  }
+
+  const { request_id } = req.params;
+  const { subject, body } = req.body;
+
+  if (!subject || !body) {
+    return res.status(400).json({ error: "Missing required fields: subject, body" });
+  }
+
+  // Get the request to find the email
+  try {
+    const request = await agentFetch(`/api/runs/${request_id}`);
+
+    if (!request.email) {
+      return res.status(400).json({ error: "No email address associated with this request" });
+    }
+
+    const info = await emailTransporter.sendMail({
+      from: etherealAccount ? etherealAccount.user : SMTP_FROM,
+      to: request.email,
+      subject,
+      text: body,
+      html: body.replace(/\n/g, "<br>"),
+    });
+
+    console.log(`[Email] Sent to ${request.email}: ${info.messageId}`);
+
+    const previewUrl = etherealAccount ? nodemailer.getTestMessageUrl(info) : null;
+    if (previewUrl) {
+      console.log(`[Email] Preview URL: ${previewUrl}`);
+    }
+
+    // Store in history
+    const emailRecord = {
+      id: uuidv4(),
+      direction: "outbound",
+      from: etherealAccount ? etherealAccount.user : SMTP_FROM,
+      to: request.email,
+      subject,
+      body,
+      timestamp: now(),
+      messageId: info.messageId,
+      previewUrl,
+    };
+
+    if (!emailHistory.has(request_id)) {
+      emailHistory.set(request_id, []);
+    }
+    emailHistory.get(request_id).push(emailRecord);
+
+    // Broadcast to connected clients
+    broadcastEvent({
+      type: "email_sent",
+      visibility: "INTERNAL",
+      request_id,
+      email: emailRecord,
+      timestamp: now(),
+    });
+
+    res.json({
+      success: true,
+      email: emailRecord,
+    });
+  } catch (err) {
+    console.error(`[Email] Failed to send:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/email/notify-reporter/:request_id
+ * Send a notification to the bug reporter for a specific request
+ * Body: { subject?, message }
+ */
+app.post("/api/email/notify-reporter/:request_id", requireInternalAuth, async (req, res) => {
+  if (!emailTransporter) {
+    return res.status(503).json({
+      error: "Email not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS environment variables.",
+    });
+  }
+
+  const { request_id } = req.params;
+  const { subject, message } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: "Missing required field: message" });
+  }
+
+  // Get the request from the agent to find the email
+  try {
+    const request = await agentFetch(`/api/runs/${request_id}`);
+
+    if (!request.email) {
+      return res.status(400).json({ error: "No email address associated with this request" });
+    }
+
+    const emailSubject = subject || `Update on your bug report: ${request.bug_report.substring(0, 50)}...`;
+    const emailBody = `Hi,
+
+${message}
+
+---
+Bug Report: ${request.bug_report}
+Status: ${request.status}
+Request ID: ${request_id}
+
+- BugFixer Team`;
+
+    const info = await emailTransporter.sendMail({
+      from: etherealAccount ? etherealAccount.user : SMTP_FROM,
+      to: request.email,
+      subject: emailSubject,
+      text: emailBody,
+      html: emailBody.replace(/\n/g, "<br>"),
+    });
+
+    console.log(`[Email] Notified reporter ${request.email}: ${info.messageId}`);
+
+    // Get preview URL for Ethereal
+    const previewUrl = etherealAccount ? nodemailer.getTestMessageUrl(info) : null;
+    if (previewUrl) {
+      console.log(`[Email] Preview URL: ${previewUrl}`);
+    }
+
+    res.json({
+      success: true,
+      messageId: info.messageId,
+      to: request.email,
+      subject: emailSubject,
+      previewUrl,
+    });
+  } catch (err) {
+    console.error(`[Email] Failed to notify reporter:`, err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

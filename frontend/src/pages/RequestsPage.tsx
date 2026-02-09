@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useRequests } from "@/services/queries";
 import { StatusBadge, LoadingState, ErrorState, EmptyState } from "@/components/ui";
 import { formatTimestamp, truncate } from "@/lib/utils";
-import { Bug } from "lucide-react";
+import { Bug, Mail } from "lucide-react";
 import type { BugRequest } from "@/types";
 
 export default function RequestsPage() {
@@ -34,6 +34,7 @@ export default function RequestsPage() {
               <tr className="border-b border-zinc-800 bg-zinc-900/60 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Bug Report</th>
+                <th className="px-4 py-3 hidden sm:table-cell">Reporter</th>
                 <th className="px-4 py-3 hidden md:table-cell">Repository</th>
                 <th className="px-4 py-3 hidden lg:table-cell">Mode</th>
                 <th className="px-4 py-3">Repro</th>
@@ -52,6 +53,16 @@ export default function RequestsPage() {
                   </td>
                   <td className="max-w-xs truncate px-4 py-3 text-zinc-200">
                     {truncate(req.bug_report, 60)}
+                  </td>
+                  <td className="hidden px-4 py-3 sm:table-cell">
+                    {req.email ? (
+                      <span className="flex items-center gap-1.5 text-zinc-400" title={req.email}>
+                        <Mail className="h-3.5 w-3.5 text-blue-400" />
+                        <span className="truncate max-w-[120px] text-xs">{req.email}</span>
+                      </span>
+                    ) : (
+                      <span className="text-zinc-600 text-xs">—</span>
+                    )}
                   </td>
                   <td className="hidden px-4 py-3 text-zinc-500 md:table-cell">
                     {req.repo_path}

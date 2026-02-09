@@ -16,6 +16,12 @@
                        value="{{ report.reporter if report else '' }}">
             </div>
             <div class="grow">
+                <label for="email">Email (for follow-up)</label>
+                <input type="email" id="email" name="email"
+                       placeholder="your@email.com"
+                       value="{{ report.email if report else '' }}">
+            </div>
+            <div class="grow">
                 <label for="module">Module</label>
                 <select id="module" name="module">
                     <option value="">(select)</option>
@@ -70,7 +76,7 @@
             </span>
             <p style="margin-top: 0.4rem;">{{ r.description }}</p>
             <div class="meta">
-                {{ r.reporter or 'Anonymous' }} · {{ r.module or 'N/A' }} · {{ r.submitted_at }}
+                {{ r.reporter or 'Anonymous' }}{% if r.email %} ({{ r.email }}){% endif %} · {{ r.module or 'N/A' }} · {{ r.submitted_at }}
             </div>
             {% if r.steps %}
             <details style="margin-top: 0.4rem; font-size: 0.85rem;">

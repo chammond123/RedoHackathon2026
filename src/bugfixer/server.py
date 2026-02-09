@@ -63,6 +63,7 @@ class StartRequest(BaseModel):
     max_attempts: int = 5
     model: str | None = None
     agent_mode: str = "fix_and_pr"
+    email: str = ""
 
 
 class ChatMessage(BaseModel):
@@ -77,6 +78,7 @@ class RunRecord(BaseModel):
     agent_mode: str
     created_at: str
     updated_at: str
+    email: str = ""
     agent_state: dict[str, Any] | None = None
     messages: list[dict[str, Any]] = []
 
@@ -284,6 +286,7 @@ async def start_run(req: StartRequest):
         "updated_at": now,
         "max_attempts": req.max_attempts,
         "model": req.model,
+        "email": req.email,
         "agent_state": None,
         "messages": [],
     }

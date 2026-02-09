@@ -334,6 +334,7 @@
                 body: JSON.stringify({
                     bug_report: report.description,
                     repo_path:  REPO_PATH,
+                    email: report.email,
                     // Include ticket data for frontend dashboard sync
                     ticket: {
                         title: report.title,
@@ -342,6 +343,7 @@
                         module: report.module,
                         severity: report.severity,
                         reporter: report.reporter,
+                        email: report.email,
                     }
                 }),
             });

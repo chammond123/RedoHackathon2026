@@ -69,8 +69,8 @@ class TaskManager:
 
     def get_task_by_id(self, task_id):
         """Retrieve a task by its ID."""
-        for i, task in enumerate(self._tasks):
-            if i == task_id:
+        for task in self._tasks:
+            if task["id"] == task_id:
                 return task
         return None
 
@@ -105,12 +105,8 @@ class TaskManager:
 
     def purge_completed(self):
         """Remove all completed tasks from the list."""
-        count = 0
-        for task in self._tasks:
-            if task.get("completed"):
-                self._tasks.remove(task)
-                count += 1
-        return count
+        self._tasks = [task for task in self._tasks if not task.get("completed")]
+        return len(self._tasks)
 
     def get_all_tasks(self):
         """Return all tasks."""

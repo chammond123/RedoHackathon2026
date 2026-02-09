@@ -34,7 +34,7 @@ export default function RequestDetailPage() {
       {/* Three-panel layout */}
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-3">
         <div className="overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40">
-          <ConversationPanel messages={request.messages} />
+          <ConversationPanel messages={request.messages} email={request.email} requestId={request.id} />
         </div>
         <div className="overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40">
           <StateViewerPanel state={request.agent_state} />

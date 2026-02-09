@@ -49,6 +49,7 @@ export interface BugRequest {
   agent_mode: AgentMode;
   created_at: string;
   updated_at: string;
+  email: string;
   agent_state: AgentState | null;
   messages: ConversationMessage[];
 }
@@ -172,10 +173,25 @@ export interface BugTicket {
   module: string;
   severity: string;
   reporter: string;
+  email: string;
   steps: string;
   submitted_at: string;
   status: "pending" | "running" | "complete" | "failed";
   run_id: string | null;
+}
+
+// ── Email Messages ──
+
+export interface EmailMessage {
+  id: string;
+  direction: "outbound" | "inbound";
+  from: string;
+  to: string;
+  subject: string;
+  body: string;
+  timestamp: string;
+  messageId?: string;
+  previewUrl?: string;
 }
 
 // ── WebSocket Events ──
@@ -187,4 +203,5 @@ export type WSEvent =
   | { type: "run_complete"; request_id: string; status: AgentStatus }
   | { type: "metrics_update"; metrics: DashboardMetrics }
   | { type: "ticket_created"; ticket: BugTicket }
-  | { type: "ticket_updated"; ticket: BugTicket };
+  | { type: "ticket_updated"; ticket: BugTicket }
+  | { type: "email_sent"; request_id: string; email: EmailMessage };
